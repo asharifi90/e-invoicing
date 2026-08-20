@@ -1,4 +1,4 @@
-package com.invoicing;
+package com.einvoicing;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
