@@ -3,21 +3,21 @@ package com.einvoicing.invoice.domain;
 import java.math.BigDecimal;
 import java.util.Objects;
 
-public record Money(BigDecimal value, String currency) {
+public record Money(BigDecimal amount, String currency) {
 
     public Money {
-        Objects.requireNonNull(value, "value is required");
+        Objects.requireNonNull(amount, "amount is required");
         Objects.requireNonNull(currency, "currency is required");
 
-        if (value.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("value must be greater than zero");
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("amount must be greater than zero");
         }
 
         if (currency.isBlank()) {
             throw new IllegalArgumentException("currency is required");
         }
 
-        value = value.setScale(2, BigDecimal.ROUND_HALF_UP);
+        amount = amount.setScale(2, BigDecimal.ROUND_HALF_UP);
         currency = currency.toUpperCase();
     }
 
@@ -34,10 +34,10 @@ public record Money(BigDecimal value, String currency) {
             throw new IllegalArgumentException("can not add different currency");
         }
 
-        return new Money(this.value.add(other.value), currency);
+        return new Money(this.amount.add(other.amount), currency);
     }
 
     public Money multiply(int quantity){
-        return new Money(this.value.multiply(BigDecimal.valueOf(quantity)), this.currency);
+        return new Money(this.amount.multiply(BigDecimal.valueOf(quantity)), this.currency);
     }
 }

@@ -2,9 +2,7 @@ package com.einvoicing.invoice.adapter.out.persistence.mapper;
 
 import com.einvoicing.invoice.adapter.out.persistence.entity.InvoiceJpaEntity;
 import com.einvoicing.invoice.adapter.out.persistence.entity.InvoiceLineJpaEntity;
-import com.einvoicing.invoice.domain.Invoice;
-import com.einvoicing.invoice.domain.InvoiceLine;
-import com.einvoicing.invoice.domain.Money;
+import com.einvoicing.invoice.domain.*;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -37,14 +35,18 @@ public class InvoiceMapper {
                 .map(this::toLineDomain)
                 .toList();
 
-        Invoice invoice = Invoice.create(
+        return Invoice.reconstitute(
+                InvoiceId.from(entity.getId().toString()),
                 entity.getInvoiceNumber(),
                 entity.getSellerVatNumber(),
                 entity.getBuyerVatNumber(),
-                lines
+                lines,
+                new Money(entity.getTotalAmount(), entity.getCurrency()),
+                InvoiceStatus.valueOf(entity.getStatus()),
+                entity.getReceivedAt(),
+                entity.getRejectionReason()
         );
 
-        return invoice;
     }
 
     private InvoiceLineJpaEntity toLineJpaEntity(InvoiceLine line) {

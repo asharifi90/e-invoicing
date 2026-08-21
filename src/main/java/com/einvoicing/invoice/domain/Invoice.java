@@ -17,15 +17,24 @@ public class Invoice {
     private final Instant receivedAt;
     private String rejectionReason;
 
-    public Invoice(InvoiceId id, String invoiceNumber, String sellerVatNumber, String buyerVatNumber, List<InvoiceLine> lines, Money totalAmount) {
+    public Invoice(InvoiceId id,
+                   String invoiceNumber,
+                   String sellerVatNumber,
+                   String buyerVatNumber,
+                   List<InvoiceLine> lines,
+                   Money totalAmount,
+                   InvoiceStatus status,
+                   Instant receivedAt,
+                   String rejectionReason) {
         this.id = Objects.requireNonNull(id);
         this.invoiceNumber = Objects.requireNonNull(invoiceNumber);
         this.sellerVatNumber = Objects.requireNonNull(sellerVatNumber);
         this.buyerVatNumber = Objects.requireNonNull(buyerVatNumber);
         this.lines = List.copyOf(lines);
         this.totalAmount = Objects.requireNonNull(totalAmount);
-        this.status = InvoiceStatus.RECEIVED;
-        this.receivedAt = Instant.now();
+        this.status = Objects.requireNonNull(status);
+        this.receivedAt = Objects.requireNonNull(receivedAt);
+        this.rejectionReason = rejectionReason;
     }
 
     public static Invoice create(String invoiceNumber,
@@ -50,7 +59,32 @@ public class Invoice {
                 sellerVatNumber,
                 buyerVatNumber,
                 lines,
-                total
+                total,
+                InvoiceStatus.RECEIVED,
+                Instant.now(),
+                null
+        );
+    }
+
+    public static Invoice reconstitute(InvoiceId id,
+                                       String invoiceNumber,
+                                       String sellerVatNumber,
+                                       String buyerVatNumber,
+                                       List<InvoiceLine> lines,
+                                       Money totalAmount,
+                                       InvoiceStatus status,
+                                       Instant receivedAt,
+                                       String rejectionReason){
+        return new Invoice(
+                id,
+                invoiceNumber,
+                sellerVatNumber,
+                buyerVatNumber,
+                lines,
+                totalAmount,
+                status,
+                receivedAt,
+                rejectionReason
         );
     }
 

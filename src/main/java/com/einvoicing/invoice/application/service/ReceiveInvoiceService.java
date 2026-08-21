@@ -39,7 +39,7 @@ public class ReceiveInvoiceService implements ReceiveInvoiceUseCase {
         eventPublisher.publish(new InvoiceReceivedEvent(
                 saved.getId().value(),
                 saved.getInvoiceNumber(),
-                saved.getTotalAmount().value(),
+                saved.getTotalAmount().amount(),
                 saved.getTotalAmount().currency()
         ));
 
