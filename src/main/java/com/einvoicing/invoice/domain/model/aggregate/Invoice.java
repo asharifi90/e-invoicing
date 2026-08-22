@@ -1,4 +1,10 @@
-package com.einvoicing.invoice.domain;
+package com.einvoicing.invoice.domain.model.aggregate;
+
+import com.einvoicing.invoice.domain.exception.InvalidInvoiceStateException;
+import com.einvoicing.invoice.domain.model.valueObject.InvoiceId;
+import com.einvoicing.invoice.domain.model.InvoiceLine;
+import com.einvoicing.invoice.domain.model.enums.InvoiceStatus;
+import com.einvoicing.invoice.domain.model.valueObject.Money;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -90,7 +96,7 @@ public class Invoice {
 
     public void markAsValidated(){
         if (this.status != InvoiceStatus.RECEIVED){
-            throw new IllegalStateException("only RECEIVED invoices can be validated");
+            throw new InvalidInvoiceStateException("only RECEIVED invoices can be validated");
         }
         this.status = InvoiceStatus.VALIDATED;
     }
@@ -102,14 +108,14 @@ public class Invoice {
 
     public void markAsWaitingApproval(){
         if (this.status != InvoiceStatus.VALIDATED){
-            throw new IllegalStateException("only VALIDATED invoices can be waiting approval");
+            throw new InvalidInvoiceStateException("only VALIDATED invoices can be waiting approval");
         }
         this.status = InvoiceStatus.WAITING_APPROVAL;
     }
 
     public void markAsApproved(){
         if (this.status != InvoiceStatus.WAITING_APPROVAL){
-            throw new IllegalStateException("only invoices waiting for approval can be approved");
+            throw new InvalidInvoiceStateException("only invoices waiting for approval can be approved");
         }
         this.status = InvoiceStatus.APPROVED;
     }
