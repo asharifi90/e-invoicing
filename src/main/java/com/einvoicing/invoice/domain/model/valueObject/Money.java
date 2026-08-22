@@ -1,4 +1,6 @@
-package com.einvoicing.invoice.domain;
+package com.einvoicing.invoice.domain.model.valueObject;
+
+import com.einvoicing.invoice.domain.exception.InvalidInvoiceStateException;
 
 import java.math.BigDecimal;
 import java.util.Objects;
@@ -10,11 +12,11 @@ public record Money(BigDecimal amount, String currency) {
         Objects.requireNonNull(currency, "currency is required");
 
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("amount must be greater than zero");
+            throw new InvalidInvoiceStateException("amount must be greater than zero");
         }
 
         if (currency.isBlank()) {
-            throw new IllegalArgumentException("currency is required");
+            throw new InvalidInvoiceStateException("currency is required");
         }
 
         amount = amount.setScale(2, BigDecimal.ROUND_HALF_UP);
@@ -31,7 +33,7 @@ public record Money(BigDecimal amount, String currency) {
 
     public Money add(Money other){
         if (!this.currency.equals(other.currency)) {
-            throw new IllegalArgumentException("can not add different currency");
+            throw new InvalidInvoiceStateException("can not add different currency");
         }
 
         return new Money(this.amount.add(other.amount), currency);

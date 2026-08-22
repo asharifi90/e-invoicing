@@ -2,7 +2,11 @@ package com.einvoicing.invoice.adapter.out.persistence.mapper;
 
 import com.einvoicing.invoice.adapter.out.persistence.entity.InvoiceJpaEntity;
 import com.einvoicing.invoice.adapter.out.persistence.entity.InvoiceLineJpaEntity;
-import com.einvoicing.invoice.domain.*;
+import com.einvoicing.invoice.domain.model.*;
+import com.einvoicing.invoice.domain.model.aggregate.Invoice;
+import com.einvoicing.invoice.domain.model.enums.InvoiceStatus;
+import com.einvoicing.invoice.domain.model.valueObject.Money;
+import com.einvoicing.invoice.domain.model.valueObject.InvoiceId;
 import org.springframework.stereotype.Component;
 
 import java.util.List;

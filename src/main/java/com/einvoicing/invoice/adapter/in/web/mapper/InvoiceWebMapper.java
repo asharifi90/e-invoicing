@@ -3,9 +3,9 @@ package com.einvoicing.invoice.adapter.in.web.mapper;
 import com.einvoicing.invoice.adapter.in.web.dto.InvoiceResponse;
 import com.einvoicing.invoice.adapter.in.web.dto.ReceiveInvoiceRequest;
 import com.einvoicing.invoice.application.port.in.ReceiveInvoiceUseCase.ReceiveInvoiceCommand;
-import com.einvoicing.invoice.domain.Invoice;
-import com.einvoicing.invoice.domain.InvoiceLine;
-import com.einvoicing.invoice.domain.Money;
+import com.einvoicing.invoice.domain.model.aggregate.Invoice;
+import com.einvoicing.invoice.domain.model.InvoiceLine;
+import com.einvoicing.invoice.domain.model.valueObject.Money;
 import org.springframework.stereotype.Component;
 
 import java.util.List;

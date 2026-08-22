@@ -1,7 +1,7 @@
 package com.einvoicing.invoice.application.port.in;
 
-import com.einvoicing.invoice.domain.Invoice;
-import com.einvoicing.invoice.domain.InvoiceLine;
+import com.einvoicing.invoice.domain.model.aggregate.Invoice;
+import com.einvoicing.invoice.domain.model.InvoiceLine;
 
 import java.util.List;
 

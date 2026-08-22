@@ -1,4 +1,4 @@
-package com.einvoicing.invoice.domain;
+package com.einvoicing.invoice.domain.model.enums;
 
 public enum InvoiceStatus {
 

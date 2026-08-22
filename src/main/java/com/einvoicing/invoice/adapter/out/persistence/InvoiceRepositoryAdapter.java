@@ -5,8 +5,8 @@ import com.einvoicing.invoice.adapter.out.persistence.entity.InvoiceJpaEntity;
 import com.einvoicing.invoice.adapter.out.persistence.mapper.InvoiceMapper;
 import com.einvoicing.invoice.adapter.out.persistence.repository.SpringDataInvoiceRepository;
 import com.einvoicing.invoice.application.port.out.InvoiceRepository;
-import com.einvoicing.invoice.domain.Invoice;
-import com.einvoicing.invoice.domain.InvoiceId;
+import com.einvoicing.invoice.domain.model.aggregate.Invoice;
+import com.einvoicing.invoice.domain.model.valueObject.InvoiceId;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;

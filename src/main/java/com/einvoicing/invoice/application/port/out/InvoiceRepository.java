@@ -1,7 +1,7 @@
 package com.einvoicing.invoice.application.port.out;
 
-import com.einvoicing.invoice.domain.Invoice;
-import com.einvoicing.invoice.domain.InvoiceId;
+import com.einvoicing.invoice.domain.model.aggregate.Invoice;
+import com.einvoicing.invoice.domain.model.valueObject.InvoiceId;
 
 import java.util.Optional;
 

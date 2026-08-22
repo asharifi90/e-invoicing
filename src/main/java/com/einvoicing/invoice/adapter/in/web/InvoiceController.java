@@ -4,7 +4,7 @@ import com.einvoicing.invoice.adapter.in.web.dto.InvoiceResponse;
 import com.einvoicing.invoice.adapter.in.web.dto.ReceiveInvoiceRequest;
 import com.einvoicing.invoice.adapter.in.web.mapper.InvoiceWebMapper;
 import com.einvoicing.invoice.application.port.in.ReceiveInvoiceUseCase;
-import com.einvoicing.invoice.domain.Invoice;
+import com.einvoicing.invoice.domain.model.aggregate.Invoice;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

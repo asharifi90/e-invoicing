@@ -1,7 +1,7 @@
 package com.einvoicing.invoice.adapter.out.messaging;
 
 import com.einvoicing.invoice.application.port.out.DomainEventPublisher;
-import com.einvoicing.invoice.event.InvoiceReceivedEvent;
+import com.einvoicing.invoice.domain.event.InvoiceReceivedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;

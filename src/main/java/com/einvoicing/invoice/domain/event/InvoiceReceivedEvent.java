@@ -1,4 +1,4 @@
-package com.einvoicing.invoice.event;
+package com.einvoicing.invoice.domain.event;
 
 import java.math.BigDecimal;
 import java.time.Instant;

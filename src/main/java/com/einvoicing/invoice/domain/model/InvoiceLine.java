@@ -1,4 +1,6 @@
-package com.einvoicing.invoice.domain;
+package com.einvoicing.invoice.domain.model;
+
+import com.einvoicing.invoice.domain.model.valueObject.Money;
 
 import java.util.Objects;
 

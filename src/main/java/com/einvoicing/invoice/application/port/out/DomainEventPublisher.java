@@ -1,6 +1,6 @@
 package com.einvoicing.invoice.application.port.out;
 
-import com.einvoicing.invoice.event.InvoiceReceivedEvent;
+import com.einvoicing.invoice.domain.event.InvoiceReceivedEvent;
 
 public interface DomainEventPublisher {
 
