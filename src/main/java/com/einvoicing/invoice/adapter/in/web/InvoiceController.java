@@ -39,7 +39,7 @@ public class InvoiceController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @GetMapping
+    @GetMapping("/{id}")
     public ResponseEntity<InvoiceResponse> getInvoice(@PathVariable UUID id) {
         Invoice invoice = getInvoiceUseCase.getById(InvoiceId.from(id.toString()));
         return ResponseEntity.ok(mapper.toResponse(invoice));
