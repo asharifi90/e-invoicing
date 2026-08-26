@@ -27,7 +27,7 @@ Built with a **hexagonal / DDD-style** layout so the domain stays independent fr
 | CI | GitHub Actions |
 
 ## Architecture
-
+```text
 adapter/in/web          → REST API
 application             → use cases + ports
 domain                  → Invoice aggregate, events, rules
@@ -54,7 +54,7 @@ Client → POST /api/invoices
 | Kafka UI | http://localhost:8090 (if enabled) |
 
 2. Configure application
-
+```text
    spring.datasource.url=jdbc:postgresql://localhost:5432/einvoice
    spring.datasource.username=einvoice
    spring.datasource.password=einvoice
@@ -65,5 +65,5 @@ Client → POST /api/invoices
 3. Start the app
    ```bash
    mvn spring-boot:run
-
+```text
    API base: http://localhost:8080
