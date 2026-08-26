@@ -58,7 +58,7 @@ public class ReceiveInvoiceServiceTest {
 
     @Test
     void receive_shouldThrow_whenDuplicateInvoiceNumber() {
-        // given
+
         when(invoiceRepository.existsByInvoiceNumber("INV-1")).thenReturn(true);
 
         ReceiveInvoiceUseCase.ReceiveInvoiceCommand command = new ReceiveInvoiceUseCase.ReceiveInvoiceCommand(
@@ -68,7 +68,7 @@ public class ReceiveInvoiceServiceTest {
                 List.of(new InvoiceLine("X", 1, Money.eur("10.00")))
         );
 
-        // when / then
+
         assertThatThrownBy(() -> receiveInvoiceService.receive(command))
                 .isInstanceOf(InvoiceAlreadyExistsException.class);
 
