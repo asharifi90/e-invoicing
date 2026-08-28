@@ -1,13 +1,13 @@
-package com.einvoicing;
+package com.einvoicing.invoice;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class InvoicingApplication {
+public class InvoiceServiceApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(InvoicingApplication.class, args);
+		SpringApplication.run(InvoiceServiceApplication.class, args);
 	}
 
 }
