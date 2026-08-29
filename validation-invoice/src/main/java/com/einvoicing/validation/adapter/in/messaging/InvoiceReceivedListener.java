@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class InvoiceReceivedListener {
@@ -13,13 +14,17 @@ public class InvoiceReceivedListener {
     private static final Logger log = LoggerFactory.getLogger(InvoiceReceivedListener.class);
 
     private final ValidateInvoiceUseCase validateInvoiceUseCase;
+    private final ObjectMapper objectMapper;
 
-    public InvoiceReceivedListener(ValidateInvoiceUseCase validateInvoiceUseCase) {
+    public InvoiceReceivedListener(ValidateInvoiceUseCase validateInvoiceUseCase,
+                                   ObjectMapper objectMapper) {
         this.validateInvoiceUseCase = validateInvoiceUseCase;
+        this.objectMapper = objectMapper;
     }
 
     @KafkaListener(topics = "invoice.received", groupId = "validation-invoice")
-    public void onMessage(InvoiceReceivedEvent event) {
+    public void onMessage(String message) {
+        InvoiceReceivedEvent event = objectMapper.readValue(message, InvoiceReceivedEvent.class);
         log.info("received InvoiceReceivedEvent with invoice id : {}", event.getInvoiceId());
         validateInvoiceUseCase.validateReceivedEvent(event);
     }
