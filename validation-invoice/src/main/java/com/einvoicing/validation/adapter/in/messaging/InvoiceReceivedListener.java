@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
@@ -24,8 +25,13 @@ public class InvoiceReceivedListener {
 
     @KafkaListener(topics = "invoice.received", groupId = "validation-invoice")
     public void onMessage(String message) {
-        InvoiceReceivedEvent event = objectMapper.readValue(message, InvoiceReceivedEvent.class);
-        log.info("received InvoiceReceivedEvent with invoice id : {}", event.getInvoiceId());
-        validateInvoiceUseCase.validateReceivedEvent(event);
+        try {
+            InvoiceReceivedEvent event = objectMapper.readValue(message, InvoiceReceivedEvent.class);
+            log.info("received InvoiceReceivedEvent with invoice id : {}", event.getInvoiceId());
+            validateInvoiceUseCase.validateReceivedEvent(event);
+        }catch (JacksonException e){
+            log.error("Invalid message received: {}", message);
+            throw new IllegalArgumentException("Invalid message received: " + message);
+        }
     }
 }

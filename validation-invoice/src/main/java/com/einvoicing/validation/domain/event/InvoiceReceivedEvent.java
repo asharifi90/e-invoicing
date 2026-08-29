@@ -40,4 +40,28 @@ public class InvoiceReceivedEvent {
     public Instant getCreatedAt() {
         return createdAt;
     }
+
+    public void setEventId(UUID eventId) {
+        this.eventId = eventId;
+    }
+
+    public void setInvoiceId(UUID invoiceId) {
+        this.invoiceId = invoiceId;
+    }
+
+    public void setInvoiceNumber(String invoiceNumber) {
+        this.invoiceNumber = invoiceNumber;
+    }
+
+    public void setTotalAmount(BigDecimal totalAmount) {
+        this.totalAmount = totalAmount;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
 }
