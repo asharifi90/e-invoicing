@@ -1,4 +1,4 @@
-package com.einvoicing.invoice.config;
+package com.einvoicing.invoice.config.kafka;
 
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
