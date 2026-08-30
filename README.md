@@ -177,6 +177,41 @@ On every push/PR to `main`, GitHub Actions:
 
 **Green CI** = build and automated tests passed on GitHub’s runners.
 
+## Authentication (JWT)
+
+Invoice API endpoints are protected with JWT.
+
+### Login
+
+```http
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+```
+
+```JSON
+{
+  "username": "demo",
+  "password": "demo123"
+}
+```
+
+Response:
+
+```JSON
+{
+  "token": "<jwt>",
+  "type": "Bearer"
+}
+```
+### Call Protected API
+
+```http
+POST http://localhost:8080/api/invoices
+Authorization: Bearer <jwt>
+Content-Type: application/json
+```
+
+
 ## Project status
 
 - [x] Invoice receive + persistence + Kafka event
@@ -185,7 +220,7 @@ On every push/PR to `main`, GitHub Actions:
 - [x] Domain & application unit tests (both modules)
 - [x] Multi-module Maven structure
 - [x] CI pipeline
-- [ ] JWT / API authentication
+- [x] JWT / API authentication
 - [ ] Approval workflow
 - [ ] DLQ for invalid Kafka messages
 - [ ] Docker image of the apps
