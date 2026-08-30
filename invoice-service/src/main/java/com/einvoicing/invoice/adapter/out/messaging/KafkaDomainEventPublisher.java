@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
-import static com.einvoicing.invoice.config.KafkaTopicConfig.INVOICE_RECEIVED_TOPIC;
+import static com.einvoicing.invoice.config.kafka.KafkaTopicConfig.INVOICE_RECEIVED_TOPIC;
 
 @Component
 public class KafkaDomainEventPublisher implements DomainEventPublisher {
