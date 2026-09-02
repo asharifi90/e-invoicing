@@ -11,6 +11,7 @@ public class InvoiceApprovedEvent {
     private String invoiceNumber;
     private Instant approvedAt;
     private InvoiceApprovalMode mode;
+    private String approvedBy;
 
     public static InvoiceApprovedEvent auto(UUID invoiceId, String invoiceNumber) {
         InvoiceApprovedEvent e = new InvoiceApprovedEvent();
@@ -19,6 +20,17 @@ public class InvoiceApprovedEvent {
         e.invoiceNumber = invoiceNumber;
         e.approvedAt = Instant.now();
         e.mode = InvoiceApprovalMode.AUTO;
+        return e;
+    }
+
+    public static InvoiceApprovedEvent manual(UUID invoiceId, String invoiceNumber, String approvedBy) {
+        InvoiceApprovedEvent e = new InvoiceApprovedEvent();
+        e.eventId = UUID.randomUUID();
+        e.invoiceId = invoiceId;
+        e.invoiceNumber = invoiceNumber;
+        e.approvedAt = Instant.now();
+        e.mode = InvoiceApprovalMode.MANUAL;
+        e.approvedBy = approvedBy;
         return e;
     }
 
@@ -60,5 +72,13 @@ public class InvoiceApprovedEvent {
 
     public void setMode(InvoiceApprovalMode mode) {
         this.mode = mode;
+    }
+
+    public String getApprovedBy() {
+        return approvedBy;
+    }
+
+    public void setApprovedBy(String approvedBy) {
+        this.approvedBy = approvedBy;
     }
 }
