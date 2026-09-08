@@ -10,17 +10,17 @@ Built as a **multi-module Maven** project with a **hexagonal / DDD-style** layou
 |--------|------|
 | **invoice-service** | REST API, PostgreSQL, publish `InvoiceReceivedEvent` |
 | **validation-invoice** | Consume `invoice.received`, apply rules, publish `invoice.validated` / `invoice.rejected` |
+| **approval-service** | 8082 | Consume `invoice.validated`, auto-approve or pending + manual `POST` approve |
 
 ## Features
 
-- Receive invoice via REST (`POST /api/invoices`)
+- Receive invoice via REST (`POST /api/invoices`) with **JWT** authentication
 - Get invoice by id (`GET /api/invoices/{id}`)
 - Persist invoices in PostgreSQL (Flyway migrations)
-- Publish `InvoiceReceivedEvent` to Kafka
-- Validate invoices asynchronously (separate consumer service)
-- Publish validation results to Kafka
-- Unit tests (domain, application, listener)
-- CI with GitHub Actions
+- Publish domain events to **Apache Kafka**
+- Asynchronous validation service
+- Approval: auto under threshold or manual via API
+- Unit tests (domain, application, listeners) + **GitHub Actions** CI
 
 ## Tech stack
 
@@ -38,31 +38,38 @@ Built as a **multi-module Maven** project with a **hexagonal / DDD-style** layou
 ## Architecture
 
 ```text
+Client
+  → POST /api/auth/login          → JWT
+  → POST /api/invoices (+ Bearer)
+  → invoice-service saves invoice
+  → Kafka: invoice.received
+  → validation-invoice
+       → invoice.validated  OR  invoice.rejected
+  → approval-service (on validated)
+       → if amount < threshold  → invoice.approved (AUTO)
+       → else → store pending + invoice.approval-required
+            → POST /api/approvals/{invoiceId}/approve
+            → invoice.approved (MANUAL)
+```
+
+```text
 invoice-service
-  adapter/in/web          → REST API
+  adapter/in/web          → REST + JWT
   application             → use cases + ports
   domain                  → Invoice aggregate, events
   adapter/out/persistence → JPA
   adapter/out/messaging   → Kafka publisher
 
 validation-invoice
-  adapter/in/messaging    → Kafka listener (invoice.received)
-  application             → validation use case
-  domain                  → rules + result events
-  adapter/out/messaging   → Kafka publisher (validated / rejected)
-```
+  adapter/in/messaging    → Kafka listener
+  application / domain    → rules
+  adapter/out/messaging   → Kafka publisher
 
-**Flow**
-
-```text
-Client
-  → POST /api/invoices
-  → invoice-service saves Invoice
-  → publish InvoiceReceivedEvent
-  → topic: invoice.received
-  → validation-invoice consumes event
-  → rules (amount, currency, invoice number, …)
-  → topic: invoice.validated  OR  invoice.rejected
+approval-service
+  adapter/in/messaging    → Kafka listener
+  adapter/in/web          → manual approve API
+  application / domain    → policy + pending store (in-memory demo)
+  adapter/out/messaging   → Kafka publisher
 ```
 
 ## Run locally
@@ -79,19 +86,7 @@ docker compose up -d
 | Kafka | `localhost:9092` |
 | Kafka UI | http://localhost:8090 (if enabled) |
 
-### 2. Configuration (examples)
-
-**invoice-service** — datasource + Kafka producer (see module `application.properties`).
-
-**validation-invoice** — Kafka consumer/producer, e.g. port `8081`:
-
-```properties
-server.port=8081
-spring.kafka.bootstrap-servers=localhost:9092
-spring.kafka.consumer.group-id=validation-invoice
-```
-
-### 3. Start both applications
+### 2. Start the three applications
 
 From the **repo root** (parent POM):
 
@@ -101,12 +96,42 @@ mvn spring-boot:run -pl invoice-service
 
 # Terminal 2
 mvn spring-boot:run -pl validation-invoice
+
+# Terminal 3
+mvn spring-boot:run -pl approval-service
 ```
 
 | Service | Base URL |
 |---------|----------|
 | invoice-service | http://localhost:8080 |
-| validation-invoice | http://localhost:8081 (if web enabled) |
+| validation-invoice | http://localhost:8081 |
+| approval-service | http://localhost:8082 |
+
+## Authentication (JWT)
+
+Demo user (in-memory): **`demo` / `demo123`**
+
+### Login
+
+```http
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+```
+
+```json
+{
+  "username": "demo",
+  "password": "demo123"
+}
+```
+
+Response includes a Bearer token. Use it on protected invoice endpoints:
+
+```http
+Authorization: Bearer <jwt-token>
+```
+
+Without a valid token → `401 Unauthorized`.
 
 ## Example API calls
 
@@ -114,6 +139,7 @@ mvn spring-boot:run -pl validation-invoice
 
 ```http
 POST http://localhost:8080/api/invoices
+Authorization: Bearer <jwt-token>
 Content-Type: application/json
 ```
 
@@ -137,16 +163,32 @@ Content-Type: application/json
 
 ```http
 GET http://localhost:8080/api/invoices/{id}
+Authorization: Bearer <jwt-token>
 ```
 
-After a successful create, check Kafka topics (console consumer or UI):
+### Manual approval (when amount ≥ auto-approve threshold, e.g. 1000 EUR)
 
-- `invoice.received` — event from invoice-service
-- `invoice.validated` or `invoice.rejected` — result from validation-invoice
+```http
+POST http://localhost:8082/api/approvals/{invoiceId}/approve
+```
+
+→ publishes `invoice.approved` with mode `MANUAL`.
+
+Pending approvals are kept **in memory** for the demo (restart clears them). Production would use a database.
+
+## Kafka topics
+
+| Topic | Producer | Meaning |
+|-------|----------|---------|
+| `invoice.received` | invoice-service | Invoice accepted and stored |
+| `invoice.validated` | validation-invoice | Passed business rules |
+| `invoice.rejected` | validation-invoice | Failed business rules |
+| `invoice.approval-required` | approval-service | Needs human approval |
+| `invoice.approved` | approval-service | Approved (AUTO or MANUAL) |
 
 ## Tests
 
-From repo root (all modules):
+From repo root:
 
 ```bash
 mvn test
@@ -155,83 +197,47 @@ mvn test
 Examples:
 
 ```bash
-mvn test -pl invoice-service -Dtest=InvoiceTest
-mvn test -pl invoice-service -Dtest=ReceiveInvoiceServiceTest,GetInvoiceServiceTest
+mvn test -pl invoice-service
 mvn test -pl validation-invoice
+mvn test -pl approval-service
 ```
 
-**Test focus**
-
-- **invoice-service:** domain rules, receive/get use cases (mocked ports)
-- **validation-invoice:** validation rules, publish validated/rejected, JSON parse in listener
-
-Note: full `@SpringBootTest` context tests need a running database; the suite relies mainly on **unit tests** so CI stays green without Postgres.
+Focus: domain rules and use cases with mocked ports (no Postgres/Kafka required in unit tests).  
+**Green CI** = `mvn clean test` passed on GitHub Actions.
 
 ## CI
 
-On every push/PR to `main`, GitHub Actions:
+On push/PR to `main`:
 
-1. Checks out the code
-2. Sets up Java 21
-3. Runs `mvn clean test` on the multi-module project
-
-**Green CI** = build and automated tests passed on GitHub’s runners.
-
-## Authentication (JWT)
-
-Invoice API endpoints are protected with JWT.
-
-### Login
-
-```http
-POST http://localhost:8080/api/auth/login
-Content-Type: application/json
-```
-
-```JSON
-{
-  "username": "demo",
-  "password": "demo123"
-}
-```
-
-Response:
-
-```JSON
-{
-  "token": "<jwt>",
-  "type": "Bearer"
-}
-```
-### Call Protected API
-
-```http
-POST http://localhost:8080/api/invoices
-Authorization: Bearer <jwt>
-Content-Type: application/json
-```
-
+1. Checkout  
+2. Java 21  
+3. `mvn clean test`  
 
 ## Project status
 
-- [x] Invoice receive + persistence + Kafka event
-- [x] GET by id
-- [x] Validation service (consume `invoice.received`, publish result)
-- [x] Domain & application unit tests (both modules)
-- [x] Multi-module Maven structure
-- [x] CI pipeline
-- [x] JWT / API authentication
-- [ ] Approval workflow
-- [ ] DLQ for invalid Kafka messages
-- [ ] Docker image of the apps
-- [ ] Integration tests with Testcontainers
+- [x] Invoice receive + persistence + Kafka event  
+- [x] GET by id  
+- [x] JWT authentication (demo user)  
+- [x] Validation service  
+- [x] Approval service (auto + manual API)  
+- [x] Unit tests + multi-module structure  
+- [x] GitHub Actions CI  
+- [ ] DLQ for invalid Kafka messages  
+- [ ] Transactional outbox (e.g. Namastack)  
+- [ ] Docker images for the apps  
+- [ ] Integration tests with Testcontainers  
+- [ ] Pending approvals in database  
 
 ## Why this project
 
-Demonstrates a realistic backend style used in European systems:
+Demonstrates a realistic European-style backend:
 
-- Clear boundaries (DDD / hexagonal)
-- Event-driven integration via Kafka
-- Multi-module microservices in one repository
-- Production-like local setup with Docker
-- Automated tests and CI
+- Clear boundaries (hexagonal / DDD-style)  
+- Event-driven microservices with Kafka  
+- Security (JWT) on the public API  
+- Automated tests and CI  
+- A full business flow: intake → validate → approve  
+
+## License / note
+
+Portfolio / learning project. Demo credentials and in-memory stores are not for production use.
