@@ -176,6 +176,13 @@ POST http://localhost:8082/api/approvals/{invoiceId}/approve
 
 Pending approvals are kept **in memory** for the demo (restart clears them). Production would use a database.
 
+## API documentation (Swagger)
+
+With `invoice-service` running:
+
+- Swagger UI: http://localhost:8080/swagger-ui/index.html
+- OpenAPI JSON: http://localhost:8080/v3/api-docs
+
 ## Kafka topics
 
 | Topic | Producer | Meaning |
@@ -221,7 +228,8 @@ On push/PR to `main`:
 - [x] Validation service  
 - [x] Approval service (auto + manual API)  
 - [x] Unit tests + multi-module structure  
-- [x] GitHub Actions CI  
+- [x] GitHub Actions CI
+- [x] Swagger / OpenAPI (springdoc) on invoice-service
 - [ ] DLQ for invalid Kafka messages  
 - [ ] Transactional outbox (e.g. Namastack)  
 - [ ] Docker images for the apps  
