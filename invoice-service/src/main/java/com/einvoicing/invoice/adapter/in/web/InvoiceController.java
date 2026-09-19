@@ -7,6 +7,8 @@ import com.einvoicing.invoice.application.port.in.GetInvoiceUseCase;
 import com.einvoicing.invoice.application.port.in.ReceiveInvoiceUseCase;
 import com.einvoicing.invoice.domain.model.aggregate.Invoice;
 import com.einvoicing.invoice.domain.model.valueObject.InvoiceId;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +32,9 @@ public class InvoiceController {
     }
 
     @PostMapping
+    @Operation(summary = "create invoice")
+    @ApiResponse(responseCode = "201", description = "Created")
+    @ApiResponse(responseCode = "401", description = "Unauthorized")
     public ResponseEntity<InvoiceResponse> receiveInvoice(
             @Valid @RequestBody ReceiveInvoiceRequest request) {
 
