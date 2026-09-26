@@ -2,6 +2,8 @@ package com.einvoicing.invoice.adapter.out.messaging;
 
 import com.einvoicing.invoice.adapter.out.persistence.entity.OutboxEventEntity;
 import com.einvoicing.invoice.adapter.out.persistence.repository.OutboxInvoiceRepository;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
@@ -18,11 +20,20 @@ public class OutboxPublisherJob {
 
     private final OutboxInvoiceRepository outboxInvoiceRepository;
     private final KafkaTemplate<String, String> kafkaTemplate;
+    private final Counter publishCounter;
+    private final Counter failCounter;
 
     public OutboxPublisherJob(OutboxInvoiceRepository outboxInvoiceRepository,
-                              KafkaTemplate<String, String> kafkaTemplate) {
+                              KafkaTemplate<String, String> kafkaTemplate,
+                              MeterRegistry meterRegistry) {
         this.outboxInvoiceRepository = outboxInvoiceRepository;
         this.kafkaTemplate = kafkaTemplate;
+        this.publishCounter = Counter.builder("outbox.published")
+                .description("Outbox events published successfully to kafka")
+                .register( meterRegistry );
+        this.failCounter = Counter.builder("outbox.published.failed")
+                .description("Outbox events attempts that failed")
+                .register( meterRegistry );
     }
 
     @Scheduled(fixedDelay = 2000)
@@ -35,8 +46,10 @@ public class OutboxPublisherJob {
                 String topic = toTopic(event.getEventType());
                 kafkaTemplate.send(topic, event.getAggregatedId(), event.getPayload());
                 event.setPublishedAt();
+                publishCounter.increment();
                 outboxInvoiceRepository.save(event);
             } catch (Exception e) {
+                failCounter.increment();
                 log.warn("Outbox publish failed id={}: {}", event.getId(), e.getMessage());
             }
         }
