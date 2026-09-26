@@ -2,9 +2,8 @@ package com.einvoicing.invoice.application.service;
 
 
 import com.einvoicing.invoice.application.port.in.ReceiveInvoiceUseCase;
-import com.einvoicing.invoice.application.port.out.DomainEventPublisher;
 import com.einvoicing.invoice.application.port.out.InvoiceRepository;
-import com.einvoicing.invoice.domain.event.InvoiceReceivedEvent;
+import com.einvoicing.invoice.application.port.out.OutboxWriter;
 import com.einvoicing.invoice.domain.exception.InvoiceAlreadyExistsException;
 import com.einvoicing.invoice.domain.model.InvoiceLine;
 import com.einvoicing.invoice.domain.model.aggregate.Invoice;
@@ -29,7 +28,7 @@ public class ReceiveInvoiceServiceTest {
     private InvoiceRepository invoiceRepository;
 
     @Mock
-    private DomainEventPublisher domainEventPublisher;
+    private OutboxWriter outboxWriter;
 
     @InjectMocks
     private ReceiveInvoiceService receiveInvoiceService;
@@ -53,7 +52,7 @@ public class ReceiveInvoiceServiceTest {
         assertThat(result.getTotalAmount().amount()).isEqualByComparingTo("1500.00");
 
         verify(invoiceRepository).save(any(Invoice.class));
-        verify(domainEventPublisher).publish(any(InvoiceReceivedEvent.class));
+        verify(outboxWriter).enqueue(eq("Invoice"), anyString(), eq("InvoiceReceived"), any());
     }
 
     @Test
@@ -73,6 +72,6 @@ public class ReceiveInvoiceServiceTest {
                 .isInstanceOf(InvoiceAlreadyExistsException.class);
 
         verify(invoiceRepository, never()).save(any());
-        verify(domainEventPublisher, never()).publish(any());
+        verify(outboxWriter, never()).enqueue(eq("Invoice"), anyString(), eq("InvoiceReceived"), any());
     }
 }
