@@ -10,7 +10,7 @@ Built as a **multi-module Maven** project with a **hexagonal / DDD-style** layou
 |--------|------|
 | **invoice-service** | REST API, PostgreSQL, publish `InvoiceReceivedEvent` |
 | **validation-invoice** | Consume `invoice.received`, apply rules, publish `invoice.validated` / `invoice.rejected` |
-| **approval-service** | 8082 | Consume `invoice.validated`, auto-approve or pending + manual `POST` approve |
+| **approval-service** | Consume `invoice.validated`, auto/manual approve → `invoice.approved` |
 
 ## Features
 
@@ -21,6 +21,9 @@ Built as a **multi-module Maven** project with a **hexagonal / DDD-style** layou
 - Asynchronous validation service
 - Approval: auto under threshold or manual via API
 - Unit tests (domain, application, listeners) + **GitHub Actions** CI
+- Transactional outbox for `InvoiceReceived` (DB + async Kafka publish)
+- HTTP correlation id (`X-Correlation-Id`) in logs
+- Outbox publish metrics (Micrometer / Actuator)
 
 ## Tech stack
 
@@ -41,8 +44,8 @@ Built as a **multi-module Maven** project with a **hexagonal / DDD-style** layou
 Client
   → POST /api/auth/login          → JWT
   → POST /api/invoices (+ Bearer)
-  → invoice-service saves invoice
-  → Kafka: invoice.received
+  → invoice-service saves invoice + outbox row
+  → job publishes to Kafka: invoice.received
   → validation-invoice
        → invoice.validated  OR  invoice.rejected
   → approval-service (on validated)
@@ -57,8 +60,8 @@ invoice-service
   adapter/in/web          → REST + JWT
   application             → use cases + ports
   domain                  → Invoice aggregate, events
-  adapter/out/persistence → JPA
-  adapter/out/messaging   → Kafka publisher
+  adapter/out/persistence → JPA + outbox table
+  adapter/out/messaging   → OutboxPublisherJob → Kafka
 
 validation-invoice
   adapter/in/messaging    → Kafka listener
@@ -193,6 +196,10 @@ With `invoice-service` running:
 | `invoice.approval-required` | approval-service | Needs human approval |
 | `invoice.approved` | approval-service | Approved (AUTO or MANUAL) |
 
+## Reliability notes
+- Outbox avoids dual-write between Postgres and Kafka for invoice intake.
+- Use `X-Correlation-Id` to trace a request in logs; metrics: `/actuator/metrics/outbox.published`.
+
 ## Tests
 
 From repo root:
@@ -230,9 +237,12 @@ On push/PR to `main`:
 - [x] Unit tests + multi-module structure  
 - [x] GitHub Actions CI
 - [x] Swagger / OpenAPI (springdoc) on invoice-service
+- [x] Docker images for the apps  
+- [x] Transactional outbox (custom) for invoice.received
+- [x] Correlation ID filter + log pattern
+- [x] Outbox metrics (published / failed)
 - [ ] DLQ for invalid Kafka messages  
-- [ ] Transactional outbox (e.g. Namastack)  
-- [ ] Docker images for the apps  
+- [ ] Payment step + resilience
 - [ ] Integration tests with Testcontainers  
 - [ ] Pending approvals in database  
 
