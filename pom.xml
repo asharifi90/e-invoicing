@@ -17,6 +17,7 @@
         <module>invoice-service</module>
         <module>validation-invoice</module>
         <module>approval-service</module>
+        <module>payment-service</module>
     </modules>
 
 	<properties>

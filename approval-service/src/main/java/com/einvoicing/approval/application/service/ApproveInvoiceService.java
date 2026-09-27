@@ -35,16 +35,18 @@ public class ApproveInvoiceService implements ApproveInvoiceUseCase {
     public void handleValidated(InvoiceValidatedEvent event) {
         if (policy.canAutoApprove(event.getTotalAmount())) {
             publisher.publishApproved(
-                    InvoiceApprovedEvent.auto(event.getInvoiceId(), event.getInvoiceNumber()));
+                    InvoiceApprovedEvent.auto(event.getInvoiceId(), event.getInvoiceNumber(),
+                            event.getTotalAmount(), event.getCurrency()));
             log.info("Auto approved InvoiceValidatedEvent and published with InvoiceNumber: {}", event.getInvoiceNumber());
         } else {
             pendingApprovalStore.save(new PendingApproval(event.getInvoiceId(), event.getInvoiceNumber(),
-                    event.getTotalAmount(), Instant.now()));
+                    event.getTotalAmount(), Instant.now(), event.getCurrency()));
             publisher.publishApprovalRequired(
                     InvoiceApprovalRequiredEvent.of(
                             event.getInvoiceId(),
                             event.getInvoiceNumber(),
-                            event.getTotalAmount()));
+                            event.getTotalAmount(),
+                            event.getCurrency()));
             log.info("InvoiceValidatedEvent require approval, published with InvoiceNumber: {}", event.getInvoiceNumber());
         }
     }

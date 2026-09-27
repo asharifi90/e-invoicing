@@ -46,7 +46,8 @@ public class ManualApprovalServiceTest {
     @Test
     void approvalManual_approved() {
         UUID id = UUID.randomUUID();
-        PendingApproval pendingApproval = new PendingApproval(id, "INV-001", new BigDecimal("1000.00"), Instant.now());
+        PendingApproval pendingApproval = new PendingApproval(id, "INV-001", new BigDecimal("1000.00"),
+                Instant.now(), "EUR");
         when(pendingApprovalStore.findByInvoiceId(id)).thenReturn(Optional.of(pendingApproval));
         manualApprovalService.approveManual(id, "demo-user");
 

@@ -39,7 +39,8 @@ public class ValidationInvoiceService implements ValidateInvoiceUseCase {
         }
         if (validate.isEmpty()) {
             validationResultPublisher.publishValidatedEvent(
-                    InvoiceValidatedEvent.of(event.getInvoiceId(), event.getInvoiceNumber()));
+                    InvoiceValidatedEvent.of(event.getInvoiceId(), event.getInvoiceNumber(),
+                            event.getTotalAmount(), event.getCurrency()));
             logger.info("Invoice validated invoice with id : {} ", event.getInvoiceId());
         }
 
