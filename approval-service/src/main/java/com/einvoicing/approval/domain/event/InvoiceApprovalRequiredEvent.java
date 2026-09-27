@@ -10,14 +10,16 @@ public class InvoiceApprovalRequiredEvent {
     private String invoiceNumber;
     private BigDecimal totalAmount;
     private Instant requestedAt;
+    private String currency;
 
-    public static InvoiceApprovalRequiredEvent of(UUID invoiceId, String number, BigDecimal amount) {
+    public static InvoiceApprovalRequiredEvent of(UUID invoiceId, String number, BigDecimal amount, String currency) {
     InvoiceApprovalRequiredEvent event = new InvoiceApprovalRequiredEvent();
     event.invoiceId = invoiceId;
     event.invoiceNumber = number;
     event.totalAmount = amount;
     event.requestedAt = Instant.now();
     event.eventId = UUID.randomUUID();
+    event.currency = currency;
     return event;
     }
 
@@ -39,5 +41,9 @@ public class InvoiceApprovalRequiredEvent {
 
     public Instant getRequestedAt() {
         return requestedAt;
+    }
+
+    public String getCurrency() {
+        return currency;
     }
 }

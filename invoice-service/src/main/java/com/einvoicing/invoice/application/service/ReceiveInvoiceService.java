@@ -3,6 +3,7 @@ package com.einvoicing.invoice.application.service;
 import com.einvoicing.invoice.application.port.in.ReceiveInvoiceUseCase;
 import com.einvoicing.invoice.application.port.out.InvoiceRepository;
 import com.einvoicing.invoice.application.port.out.OutboxWriter;
+import com.einvoicing.invoice.domain.event.InvoiceReceivedEvent;
 import com.einvoicing.invoice.domain.exception.InvoiceAlreadyExistsException;
 import com.einvoicing.invoice.domain.model.aggregate.Invoice;
 import org.slf4j.Logger;
@@ -57,7 +58,8 @@ public class ReceiveInvoiceService implements ReceiveInvoiceUseCase {
                 "Invoice",
                 invoice.getId().toString(),
                 "InvoiceReceived",
-                invoice
+                new InvoiceReceivedEvent(saved.getId().value(), saved.getInvoiceNumber(),
+                        saved.getTotalAmount().amount(), saved.getTotalAmount().currency())
         );
 
         log.info("InvoiceReceivedEvent published for invoiceId={}", saved.getId().value());

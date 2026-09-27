@@ -8,6 +8,7 @@ public record PendingApproval(
         UUID invoiceId,
         String invoiceNumber,
         BigDecimal totalAmount,
-        Instant requestedAt
+        Instant requestedAt,
+        String currency
 ) {
 }

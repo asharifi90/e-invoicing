@@ -27,7 +27,8 @@ public class ManualApprovalService implements ManualApprovalUseCase {
         PendingApproval pendingApproval = store.findByInvoiceId(invoiceId).
                 orElseThrow(() -> new IllegalArgumentException("No pending approval found for invoice " + invoiceId));
         publisher.publishApproved(
-                InvoiceApprovedEvent.manual(pendingApproval.invoiceId(), pendingApproval.invoiceNumber(), approvedBy)
+                InvoiceApprovedEvent.manual(pendingApproval.invoiceId(), pendingApproval.invoiceNumber(), approvedBy,
+                        pendingApproval.totalAmount(), pendingApproval.currency())
         );
         store.delete(invoiceId);
     }
