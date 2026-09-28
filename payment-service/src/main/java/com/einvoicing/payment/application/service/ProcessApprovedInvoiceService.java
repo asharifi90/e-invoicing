@@ -1,7 +1,6 @@
 package com.einvoicing.payment.application.service;
 
 import com.einvoicing.payment.application.port.in.ProcessApprovedInvoiceUseCase;
-import com.einvoicing.payment.application.port.out.PaymentProvider;
 import com.einvoicing.payment.application.port.out.PaymentResultPublisher;
 import com.einvoicing.payment.application.port.out.dto.PaymentProviderResult;
 import com.einvoicing.payment.domain.event.InvoiceApprovedEvent;
@@ -16,13 +15,14 @@ public class ProcessApprovedInvoiceService implements ProcessApprovedInvoiceUseC
 
     public static final Logger log = LoggerFactory.getLogger(ProcessApprovedInvoiceService.class);
 
-    private final PaymentProvider paymentProvider;
-    private final PaymentResultPublisher paymentResultPublisher;
 
-    public ProcessApprovedInvoiceService(PaymentProvider paymentProvider,
-                                         PaymentResultPublisher paymentResultPublisher) {
-        this.paymentProvider = paymentProvider;
+    private final PaymentResultPublisher paymentResultPublisher;
+    private final ResilientPaymentGateway resilientPaymentGateway;
+
+    public ProcessApprovedInvoiceService(PaymentResultPublisher paymentResultPublisher,
+                                         ResilientPaymentGateway resilientPaymentGateway) {
         this.paymentResultPublisher = paymentResultPublisher;
+        this.resilientPaymentGateway = resilientPaymentGateway;
     }
 
     @Override
@@ -30,7 +30,7 @@ public class ProcessApprovedInvoiceService implements ProcessApprovedInvoiceUseC
 
         log.info("Processing approved invoice with invoice number: {}", event.getInvoiceNumber());
 
-        PaymentProviderResult result = paymentProvider.charge(event.getInvoiceId(),
+        PaymentProviderResult result = resilientPaymentGateway.charge(event.getInvoiceId(),
                 event.getInvoiceNumber(),
                 event.getTotalAmount(),
                 event.getCurrency() != null ? event.getCurrency() : "EUR");
