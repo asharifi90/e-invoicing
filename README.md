@@ -11,6 +11,7 @@ Built as a **multi-module Maven** project with a **hexagonal / DDD-style** layou
 | **invoice-service** | REST API, PostgreSQL, publish `InvoiceReceivedEvent` |
 | **validation-invoice** | Consume `invoice.received`, apply rules, publish `invoice.validated` / `invoice.rejected` |
 | **approval-service** | Consume `invoice.validated`, auto/manual approve → `invoice.approved` |
+| **payment-service** | Consume `invoice.approved`, simulated PSP, publish `payment.succeeded` / `payment.failed` |
 
 ## Features
 
@@ -24,6 +25,9 @@ Built as a **multi-module Maven** project with a **hexagonal / DDD-style** layou
 - Transactional outbox for `InvoiceReceived` (DB + async Kafka publish)
 - HTTP correlation id (`X-Correlation-Id`) in logs
 - Outbox publish metrics (Micrometer / Actuator)
+- Payment step after approval (simulated provider)
+- Resilience4j on payment provider (retry + circuit breaker + fallback)
+- Payment idempotency (same invoiceId not charged twice; in-memory store for demo)
 
 ## Tech stack
 
@@ -73,6 +77,11 @@ approval-service
   adapter/in/web          → manual approve API
   application / domain    → policy + pending store (in-memory demo)
   adapter/out/messaging   → Kafka publisher
+
+payment-service
+  resilient charge (retry / circuit breaker)
+  idempotency guard on invoiceId
+  payment.succeeded  OR  payment.failed
 ```
 
 ## Run locally
@@ -102,6 +111,9 @@ mvn spring-boot:run -pl validation-invoice
 
 # Terminal 3
 mvn spring-boot:run -pl approval-service
+
+# Terminal 4
+mvn spring-boot:run -pl payment-service
 ```
 
 | Service | Base URL |
@@ -195,10 +207,14 @@ With `invoice-service` running:
 | `invoice.rejected` | validation-invoice | Failed business rules |
 | `invoice.approval-required` | approval-service | Needs human approval |
 | `invoice.approved` | approval-service | Approved (AUTO or MANUAL) |
+| `payment.succeeded` | payment-service | Payment completed (simulated PSP) |
+| `payment.failed`   | payment-service | Payment failed after provider/fallback |
 
 ## Reliability notes
 - Outbox avoids dual-write between Postgres and Kafka for invoice intake.
 - Use `X-Correlation-Id` to trace a request in logs; metrics: `/actuator/metrics/outbox.published`.
+- Payment calls go through Resilience4j (retry, circuit breaker, fallback).
+- Duplicate `invoice.approved` deliveries are ignored for the same invoiceId (in-memory idempotency store; production would use a DB unique key).
 
 ## Tests
 
@@ -241,6 +257,9 @@ On push/PR to `main`:
 - [x] Transactional outbox (custom) for invoice.received
 - [x] Correlation ID filter + log pattern
 - [x] Outbox metrics (published / failed)
+- [x] Payment service (simulated provider)
+- [x] Resilience4j (retry + circuit breaker) on payment
+- [x] Payment idempotency (in-memory demo)
 - [ ] DLQ for invalid Kafka messages  
 - [ ] Payment step + resilience
 - [ ] Integration tests with Testcontainers  
