@@ -209,12 +209,14 @@ With `invoice-service` running:
 | `invoice.approved` | approval-service | Approved (AUTO or MANUAL) |
 | `payment.succeeded` | payment-service | Payment completed (simulated PSP) |
 | `payment.failed`   | payment-service | Payment failed after provider/fallback |
+| invoice.approved.DLT | payment-service (error handler) | Poison messages after retries |
 
 ## Reliability notes
 - Outbox avoids dual-write between Postgres and Kafka for invoice intake.
 - Use `X-Correlation-Id` to trace a request in logs; metrics: `/actuator/metrics/outbox.published`.
 - Payment calls go through Resilience4j (retry, circuit breaker, fallback).
 - Duplicate `invoice.approved` deliveries are ignored for the same invoiceId (in-memory idempotency store; production would use a DB unique key).
+- - Invalid or repeatedly failing `invoice.approved` messages are redirected to `invoice.approved.DLT` so the main consumer can continue.
 
 ## Tests
 
@@ -260,10 +262,8 @@ On push/PR to `main`:
 - [x] Payment service (simulated provider)
 - [x] Resilience4j (retry + circuit breaker) on payment
 - [x] Payment idempotency (in-memory demo)
-- [ ] DLQ for invalid Kafka messages  
-- [ ] Payment step + resilience
+- [x] DLQ for failed payment consumption (`invoice.approved.DLT`)
 - [ ] Integration tests with Testcontainers  
-- [ ] Pending approvals in database  
 
 ## Why this project
 
