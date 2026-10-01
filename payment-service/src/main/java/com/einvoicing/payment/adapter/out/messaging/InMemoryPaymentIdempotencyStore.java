@@ -17,9 +17,35 @@ public class InMemoryPaymentIdempotencyStore implements PaymentIdempotencyStore 
 
     @Override
     public boolean tryBegin(UUID invoiceId) {
-        Entry existing = store.putIfAbsent(invoiceId,
-                new Entry(PaymentAttemptStatus.PROCESSING, null, null));
-        return existing == null;
+        while (true) {
+            Entry current = store.get(invoiceId);
+
+            if (current == null) {
+                Entry started = new Entry(PaymentAttemptStatus.PROCESSING, null, null);
+                if (store.putIfAbsent(invoiceId, started) == null) {
+                    return true;
+                }
+                continue;
+            }
+
+            if (current.status() == PaymentAttemptStatus.SUCCEEDED) {
+                return false;
+            }
+
+            if (current.status() == PaymentAttemptStatus.PROCESSING) {
+                return false;
+            }
+
+            if (current.status() == PaymentAttemptStatus.FAILED) {
+                Entry restarted = new Entry(PaymentAttemptStatus.PROCESSING, null, null);
+                if (store.replace(invoiceId, current, restarted)) {
+                    return true;
+                }
+                continue;
+            }
+
+            return false;
+        }
     }
 
     @Override

@@ -51,28 +51,42 @@ public class ProcessApprovedInvoiceService implements ProcessApprovedInvoiceUseC
 
         log.info("Processing approved invoice with invoice number: {}", event.getInvoiceNumber());
 
-        PaymentProviderResult result = resilientPaymentGateway.charge(event.getInvoiceId(),
-                event.getInvoiceNumber(),
-                event.getTotalAmount(),
-                getCurrency(event));
+        try {
+            PaymentProviderResult result = resilientPaymentGateway.charge(event.getInvoiceId(),
+                    event.getInvoiceNumber(),
+                    event.getTotalAmount(),
+                    getCurrency(event));
 
-        if (result.isSuccess()){
-            paymentIdempotencyStore.markSucceeded(invoiceId, result.getProviderReference());
-            paymentResultPublisher.paymentSucceeded(
-                    PaymentSucceededEvent.of(event.getInvoiceId(),
-                            event.getInvoiceNumber(),
-                            event.getTotalAmount(),
-                            getCurrency(event),
-                            result.getProviderReference())
-            );
-        } else {
-            paymentIdempotencyStore.markFailed(invoiceId, result.getFailureReason());
+            if (result.isSuccess()) {
+                paymentIdempotencyStore.markSucceeded(invoiceId, result.getProviderReference());
+                paymentResultPublisher.paymentSucceeded(
+                        PaymentSucceededEvent.of(event.getInvoiceId(),
+                                event.getInvoiceNumber(),
+                                event.getTotalAmount(),
+                                getCurrency(event),
+                                result.getProviderReference())
+                );
+            } else {
+                paymentIdempotencyStore.markFailed(invoiceId, result.getFailureReason());
+                paymentResultPublisher.paymentFailed(
+                        PaymentFailedEvent.of(event.getInvoiceId(),
+                                event.getInvoiceNumber(),
+                                result.getFailureReason(),
+                                event.getTotalAmount(),
+                                getCurrency(event))
+                );
+            }
+        }catch (Exception ex) {
+            log.error("Payment charge failed for invoice {}", invoiceId, ex);
+            paymentIdempotencyStore.markFailed(invoiceId, ex.getMessage());
             paymentResultPublisher.paymentFailed(
-                    PaymentFailedEvent.of(event.getInvoiceId(),
+                    PaymentFailedEvent.of(
+                            invoiceId,
                             event.getInvoiceNumber(),
-                            result.getFailureReason(),
+                            ex.getMessage() != null ? ex.getMessage() : "payment failed",
                             event.getTotalAmount(),
-                            getCurrency(event))
+                            getCurrency(event)
+                    )
             );
         }
     }
