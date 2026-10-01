@@ -11,6 +11,7 @@ import java.util.UUID;
 @Component
 public class SimulatedPaymentProvider implements PaymentProvider {
 
+
     private final String mode;
     private final long slowMs;
 
@@ -24,7 +25,7 @@ public class SimulatedPaymentProvider implements PaymentProvider {
     public PaymentProviderResult charge(UUID invoiceId, String invoiceNumber, BigDecimal amount, String currency) {
 
         return switch (mode.toUpperCase()) {
-            case "FAIL" -> PaymentProviderResult.failure("Simulated provider failed");
+            case "FAIL" -> throw new IllegalArgumentException("Simulated provider failed");
             case "SLOW" -> {
                 try {
                     Thread.sleep(slowMs);
