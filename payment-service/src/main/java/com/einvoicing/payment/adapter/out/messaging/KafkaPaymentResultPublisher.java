@@ -24,13 +24,13 @@ public class KafkaPaymentResultPublisher implements PaymentResultPublisher {
     }
 
     @Override
-    public void paymentSucceeded(PaymentSucceededEvent event) {
+    public void publishSucceeded(PaymentSucceededEvent event) {
         send("payment.succeeded", event.getInvoiceNumber(), objectMapper.writeValueAsString(event));
         log.info("payment succeeded event sent to kafka successfully, invoice number: {}", event.getInvoiceNumber());
     }
 
     @Override
-    public void paymentFailed(PaymentFailedEvent event) {
+    public void publishFailed(PaymentFailedEvent event) {
         send("payment.failed", event.getInvoiceNumber(), objectMapper.writeValueAsString(event));
         log.info("payment failed event sent to kafka successfully, invoice number: {}", event.getInvoiceNumber());
     }

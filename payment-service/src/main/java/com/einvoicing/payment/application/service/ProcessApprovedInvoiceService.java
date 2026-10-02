@@ -40,7 +40,7 @@ public class ProcessApprovedInvoiceService implements ProcessApprovedInvoiceUseC
             PaymentAttemptStatus paymentAttemptStatus = paymentIdempotencyStore.findStatus(invoiceId).orElse(null);
             log.info("Duplicate payment skipped for invoice {} and status {}", invoiceId, paymentAttemptStatus);
             if (paymentAttemptStatus == PaymentAttemptStatus.SUCCEEDED) {
-                paymentResultPublisher.paymentSucceeded(
+                paymentResultPublisher.publishSucceeded(
                         PaymentSucceededEvent.of(invoiceId, event.getInvoiceNumber(), event.getTotalAmount(),
                                 getCurrency(event),
                                 paymentIdempotencyStore.findPaymentReference(invoiceId).orElse("IDEMPOTENT-REPLAY"))
@@ -59,7 +59,7 @@ public class ProcessApprovedInvoiceService implements ProcessApprovedInvoiceUseC
 
             if (result.isSuccess()) {
                 paymentIdempotencyStore.markSucceeded(invoiceId, result.getProviderReference());
-                paymentResultPublisher.paymentSucceeded(
+                paymentResultPublisher.publishSucceeded(
                         PaymentSucceededEvent.of(event.getInvoiceId(),
                                 event.getInvoiceNumber(),
                                 event.getTotalAmount(),
@@ -68,7 +68,7 @@ public class ProcessApprovedInvoiceService implements ProcessApprovedInvoiceUseC
                 );
             } else {
                 paymentIdempotencyStore.markFailed(invoiceId, result.getFailureReason());
-                paymentResultPublisher.paymentFailed(
+                paymentResultPublisher.publishFailed(
                         PaymentFailedEvent.of(event.getInvoiceId(),
                                 event.getInvoiceNumber(),
                                 result.getFailureReason(),
@@ -79,7 +79,7 @@ public class ProcessApprovedInvoiceService implements ProcessApprovedInvoiceUseC
         }catch (Exception ex) {
             log.error("Payment charge failed for invoice {}", invoiceId, ex);
             paymentIdempotencyStore.markFailed(invoiceId, ex.getMessage());
-            paymentResultPublisher.paymentFailed(
+            paymentResultPublisher.publishFailed(
                     PaymentFailedEvent.of(
                             invoiceId,
                             event.getInvoiceNumber(),
