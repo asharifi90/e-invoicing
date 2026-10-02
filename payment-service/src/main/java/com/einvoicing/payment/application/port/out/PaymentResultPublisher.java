@@ -5,6 +5,6 @@ import com.einvoicing.payment.domain.event.PaymentSucceededEvent;
 
 public interface PaymentResultPublisher {
 
-    void paymentSucceeded(PaymentSucceededEvent event);
-    void paymentFailed(PaymentFailedEvent event);
+    void publishSucceeded(PaymentSucceededEvent event);
+    void publishFailed(PaymentFailedEvent event);
 }
