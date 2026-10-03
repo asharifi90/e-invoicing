@@ -23,13 +23,16 @@ public class ProcessApprovedInvoiceService implements ProcessApprovedInvoiceUseC
     private final PaymentResultPublisher paymentResultPublisher;
     private final ResilientPaymentGateway resilientPaymentGateway;
     private final PaymentIdempotencyStore paymentIdempotencyStore;
+    private final PaymentMetrics paymentMetrics;
 
     public ProcessApprovedInvoiceService(PaymentResultPublisher paymentResultPublisher,
                                          ResilientPaymentGateway resilientPaymentGateway,
-                                         PaymentIdempotencyStore paymentIdempotencyStore) {
+                                         PaymentIdempotencyStore paymentIdempotencyStore,
+                                         PaymentMetrics paymentMetrics) {
         this.paymentResultPublisher = paymentResultPublisher;
         this.resilientPaymentGateway = resilientPaymentGateway;
         this.paymentIdempotencyStore = paymentIdempotencyStore;
+        this.paymentMetrics = paymentMetrics;
     }
 
     @Override
@@ -39,12 +42,14 @@ public class ProcessApprovedInvoiceService implements ProcessApprovedInvoiceUseC
         if (!paymentIdempotencyStore.tryBegin(invoiceId)) {
             PaymentAttemptStatus paymentAttemptStatus = paymentIdempotencyStore.findStatus(invoiceId).orElse(null);
             log.info("Duplicate payment skipped for invoice {} and status {}", invoiceId, paymentAttemptStatus);
+            paymentMetrics.duplicateSkipped();
             if (paymentAttemptStatus == PaymentAttemptStatus.SUCCEEDED) {
-                paymentResultPublisher.publishSucceeded(
-                        PaymentSucceededEvent.of(invoiceId, event.getInvoiceNumber(), event.getTotalAmount(),
-                                getCurrency(event),
-                                paymentIdempotencyStore.findPaymentReference(invoiceId).orElse("IDEMPOTENT-REPLAY"))
-                );
+                paymentResultPublisher.publishSucceeded(PaymentSucceededEvent.of(
+                        invoiceId,
+                        event.getInvoiceNumber(),
+                        event.getTotalAmount(),
+                        getCurrency(event),
+                        paymentIdempotencyStore.findPaymentReference(invoiceId).orElse("IDEMPOTENT-REPLAY")));
             }
             return;
         }
@@ -59,6 +64,7 @@ public class ProcessApprovedInvoiceService implements ProcessApprovedInvoiceUseC
 
             if (result.isSuccess()) {
                 paymentIdempotencyStore.markSucceeded(invoiceId, result.getProviderReference());
+                paymentMetrics.success();
                 paymentResultPublisher.publishSucceeded(
                         PaymentSucceededEvent.of(event.getInvoiceId(),
                                 event.getInvoiceNumber(),
@@ -68,6 +74,7 @@ public class ProcessApprovedInvoiceService implements ProcessApprovedInvoiceUseC
                 );
             } else {
                 paymentIdempotencyStore.markFailed(invoiceId, result.getFailureReason());
+                paymentMetrics.failed();
                 paymentResultPublisher.publishFailed(
                         PaymentFailedEvent.of(event.getInvoiceId(),
                                 event.getInvoiceNumber(),
@@ -79,6 +86,7 @@ public class ProcessApprovedInvoiceService implements ProcessApprovedInvoiceUseC
         }catch (Exception ex) {
             log.error("Payment charge failed for invoice {}", invoiceId, ex);
             paymentIdempotencyStore.markFailed(invoiceId, ex.getMessage());
+            paymentMetrics.failed();
             paymentResultPublisher.publishFailed(
                     PaymentFailedEvent.of(
                             invoiceId,
