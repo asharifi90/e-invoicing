@@ -28,6 +28,7 @@ Built as a **multi-module Maven** project with a **hexagonal / DDD-style** layou
 - Payment step after approval (simulated provider)
 - Resilience4j on payment provider (retry + circuit breaker + fallback)
 - Payment idempotency (same invoiceId not charged twice; in-memory store for demo)
+- DLQ: failed `invoice.approved` processing → `invoice.approved.DLT`
 
 ## Tech stack
 
@@ -57,6 +58,8 @@ Client
        → else → store pending + invoice.approval-required
             → POST /api/approvals/{invoiceId}/approve
             → invoice.approved (MANUAL)
+→ payment-service → charge (Resilience4j + idempotency)
+       → payment.succeeded | payment.failed
 ```
 
 ```text
@@ -216,7 +219,7 @@ With `invoice-service` running:
 - Use `X-Correlation-Id` to trace a request in logs; metrics: `/actuator/metrics/outbox.published`.
 - Payment calls go through Resilience4j (retry, circuit breaker, fallback).
 - Duplicate `invoice.approved` deliveries are ignored for the same invoiceId (in-memory idempotency store; production would use a DB unique key).
-- - Invalid or repeatedly failing `invoice.approved` messages are redirected to `invoice.approved.DLT` so the main consumer can continue.
+- Invalid or repeatedly failing `invoice.approved` messages are redirected to `invoice.approved.DLT` so the main consumer can continue.
 
 ## Tests
 
@@ -232,6 +235,7 @@ Examples:
 mvn test -pl invoice-service
 mvn test -pl validation-invoice
 mvn test -pl approval-service
+mvn test -pl payment-service
 ```
 
 Focus: domain rules and use cases with mocked ports (no Postgres/Kafka required in unit tests).  
@@ -263,7 +267,9 @@ On push/PR to `main`:
 - [x] Resilience4j (retry + circuit breaker) on payment
 - [x] Payment idempotency (in-memory demo)
 - [x] DLQ for failed payment consumption (`invoice.approved.DLT`)
-- [ ] Integration tests with Testcontainers  
+- [x] Payment unit tests (store, use case, gateway, listener)
+- [ ] Integration tests with Testcontainers
+- [ ] Persistent payment store (prod-style) 
 
 ## Why this project
 
