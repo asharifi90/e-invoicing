@@ -43,6 +43,9 @@ Built as a **multi-module Maven** project with a **hexagonal / DDD-style** layou
 | Tests | JUnit 5, Mockito, AssertJ |
 | CI | GitHub Actions |
 
+## Design & failure modes
+See [docs/FAILURE_MODES.md](docs/FAILURE_MODES.md).
+
 ## Architecture
 
 ```text
