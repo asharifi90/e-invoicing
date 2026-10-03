@@ -35,12 +35,15 @@ class ProcessApprovedInvoiceServiceTest {
 
     private ProcessApprovedInvoiceService service;
 
+    private PaymentMetrics paymentMetrics;
+
     @BeforeEach
     void setUp() {
         service = new ProcessApprovedInvoiceService(
                 paymentResultPublisher,
                 resilientPaymentGateway,
-                idempotencyStore
+                idempotencyStore,
+                paymentMetrics
         );
     }
 
