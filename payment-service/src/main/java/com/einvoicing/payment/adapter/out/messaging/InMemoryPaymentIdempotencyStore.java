@@ -2,13 +2,11 @@ package com.einvoicing.payment.adapter.out.messaging;
 
 import com.einvoicing.payment.application.port.out.PaymentIdempotencyStore;
 import com.einvoicing.payment.application.port.out.dto.PaymentAttemptStatus;
-import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Component
 public class InMemoryPaymentIdempotencyStore implements PaymentIdempotencyStore {
 
     private final ConcurrentHashMap<UUID, Entry> store = new ConcurrentHashMap<>();
@@ -49,6 +47,11 @@ public class InMemoryPaymentIdempotencyStore implements PaymentIdempotencyStore 
     }
 
     @Override
+    public boolean tryBegin(UUID invoiceId, String invoiceNumber) {
+        return false;
+    }
+
+    @Override
     public void markSucceeded(UUID invoiceId, String provideReference) {
         store.put(invoiceId, new Entry(PaymentAttemptStatus.SUCCEEDED, provideReference, null));
     }
@@ -64,7 +67,7 @@ public class InMemoryPaymentIdempotencyStore implements PaymentIdempotencyStore 
     }
 
     @Override
-    public Optional<String> findPaymentReference(UUID invoiceId) {
+    public Optional<String> findProviderReference(UUID invoiceId) {
         return Optional.ofNullable(store.get(invoiceId))
                 .map(Entry::providerReference)
                 .filter(r -> !r.isBlank());

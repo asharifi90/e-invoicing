@@ -35,6 +35,7 @@ class ProcessApprovedInvoiceServiceTest {
 
     private ProcessApprovedInvoiceService service;
 
+    @Mock
     private PaymentMetrics paymentMetrics;
 
     @BeforeEach
@@ -63,7 +64,7 @@ class ProcessApprovedInvoiceServiceTest {
         UUID invoiceId = UUID.randomUUID();
         InvoiceApprovedEvent event = approvedEvent(invoiceId);
 
-        when(idempotencyStore.tryBegin(invoiceId)).thenReturn(true);
+        when(idempotencyStore.tryBegin(invoiceId, event.getInvoiceNumber())).thenReturn(true);
         when(resilientPaymentGateway.charge(
                 eq(invoiceId),
                 eq("INV-1"),
@@ -85,7 +86,7 @@ class ProcessApprovedInvoiceServiceTest {
         UUID invoiceId = UUID.randomUUID();
         InvoiceApprovedEvent event = approvedEvent(invoiceId);
 
-        when(idempotencyStore.tryBegin(invoiceId)).thenReturn(true);
+        when(idempotencyStore.tryBegin(invoiceId, event.getInvoiceNumber())).thenReturn(true);
         when(resilientPaymentGateway.charge(any(), any(), any(), any()))
                 .thenReturn(PaymentProviderResult.failure("provider down"));
 
@@ -102,10 +103,10 @@ class ProcessApprovedInvoiceServiceTest {
         UUID invoiceId = UUID.randomUUID();
         InvoiceApprovedEvent event = approvedEvent(invoiceId);
 
-        when(idempotencyStore.tryBegin(invoiceId)).thenReturn(false);
+        when(idempotencyStore.tryBegin(invoiceId, event.getInvoiceNumber())).thenReturn(false);
         when(idempotencyStore.findStatus(invoiceId))
                 .thenReturn(Optional.of(PaymentAttemptStatus.SUCCEEDED));
-        when(idempotencyStore.findPaymentReference(invoiceId))
+        when(idempotencyStore.findProviderReference(invoiceId))
                 .thenReturn(Optional.of("SIM-123"));
 
         service.handle(event);
@@ -122,7 +123,7 @@ class ProcessApprovedInvoiceServiceTest {
         UUID invoiceId = UUID.randomUUID();
         InvoiceApprovedEvent event = approvedEvent(invoiceId);
 
-        when(idempotencyStore.tryBegin(invoiceId)).thenReturn(false);
+        when(idempotencyStore.tryBegin(invoiceId, event.getInvoiceNumber())).thenReturn(false);
         when(idempotencyStore.findStatus(invoiceId))
                 .thenReturn(Optional.of(PaymentAttemptStatus.FAILED));
 
@@ -139,7 +140,7 @@ class ProcessApprovedInvoiceServiceTest {
         UUID invoiceId = UUID.randomUUID();
         InvoiceApprovedEvent event = approvedEvent(invoiceId);
 
-        when(idempotencyStore.tryBegin(invoiceId)).thenReturn(true);
+        when(idempotencyStore.tryBegin(invoiceId, event.getInvoiceNumber())).thenReturn(true);
         when(resilientPaymentGateway.charge(any(), any(), any(), any()))
                 .thenReturn(PaymentProviderResult.success("SIM-RETRY"));
 

@@ -11,8 +11,9 @@ public interface PaymentIdempotencyStore {
      * @return true, if we can request a new payment for this invoiceId
      */
     boolean tryBegin(UUID invoiceId);
+    boolean tryBegin(UUID invoiceId, String invoiceNumber);
     void markSucceeded(UUID invoiceId, String provideReference);
     void markFailed(UUID invoiceId, String reason);
     Optional<PaymentAttemptStatus> findStatus(UUID invoiceId);
-    Optional<String> findPaymentReference(UUID invoiceId);
+    Optional<String> findProviderReference(UUID invoiceId);
 }

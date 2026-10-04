@@ -39,7 +39,7 @@ public class ProcessApprovedInvoiceService implements ProcessApprovedInvoiceUseC
     public void handle(InvoiceApprovedEvent event) {
 
         UUID invoiceId = event.getInvoiceId();
-        if (!paymentIdempotencyStore.tryBegin(invoiceId)) {
+        if (!paymentIdempotencyStore.tryBegin(invoiceId, event.getInvoiceNumber())) {
             PaymentAttemptStatus paymentAttemptStatus = paymentIdempotencyStore.findStatus(invoiceId).orElse(null);
             log.info("Duplicate payment skipped for invoice {} and status {}", invoiceId, paymentAttemptStatus);
             paymentMetrics.duplicateSkipped();
@@ -49,7 +49,7 @@ public class ProcessApprovedInvoiceService implements ProcessApprovedInvoiceUseC
                         event.getInvoiceNumber(),
                         event.getTotalAmount(),
                         getCurrency(event),
-                        paymentIdempotencyStore.findPaymentReference(invoiceId).orElse("IDEMPOTENT-REPLAY")));
+                        paymentIdempotencyStore.findProviderReference(invoiceId).orElse("IDEMPOTENT-REPLAY")));
             }
             return;
         }
