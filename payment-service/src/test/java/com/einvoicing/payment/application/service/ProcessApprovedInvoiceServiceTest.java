@@ -35,6 +35,7 @@ class ProcessApprovedInvoiceServiceTest {
 
     private ProcessApprovedInvoiceService service;
 
+    @Mock
     private PaymentMetrics paymentMetrics;
 
     @BeforeEach
@@ -105,7 +106,7 @@ class ProcessApprovedInvoiceServiceTest {
         when(idempotencyStore.tryBegin(invoiceId)).thenReturn(false);
         when(idempotencyStore.findStatus(invoiceId))
                 .thenReturn(Optional.of(PaymentAttemptStatus.SUCCEEDED));
-        when(idempotencyStore.findPaymentReference(invoiceId))
+        when(idempotencyStore.findProviderReference(invoiceId))
                 .thenReturn(Optional.of("SIM-123"));
 
         service.handle(event);

@@ -38,7 +38,7 @@ public class InMemoryPaymentIdempotencyStoreTest {
         UUID invoiceId = UUID.randomUUID();
         paymentIdempotencyStore.tryBegin(invoiceId);
         paymentIdempotencyStore.markSucceeded(invoiceId, "test");
-        String paymentReference = paymentIdempotencyStore.findPaymentReference(invoiceId).get();
+        String paymentReference = paymentIdempotencyStore.findProviderReference(invoiceId).get();
 
         Assertions.assertFalse(paymentIdempotencyStore.tryBegin(invoiceId));
         assertThat(paymentReference).isEqualTo("test");
