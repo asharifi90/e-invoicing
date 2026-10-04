@@ -120,6 +120,14 @@ public class Invoice {
         this.status = InvoiceStatus.APPROVED;
     }
 
+    public void markPaymentFailed(String reason) {
+        if (this.status == InvoiceStatus.PAYMENT_FAILED) {
+            return;
+        }
+        this.status = InvoiceStatus.PAYMENT_FAILED;
+        this.rejectionReason = reason;
+    }
+
     public InvoiceId getId() {
         return id;
     }
