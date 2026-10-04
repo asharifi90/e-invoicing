@@ -14,14 +14,14 @@ public interface PaymentAttemptJpaRepository extends JpaRepository<PaymentAttemp
      * @return number of rows updated (0 or 1)
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("""
-        update PaymentAttemptEntity p
-           set p.status = com.einvoicing.payment.application.port.out.dto.PaymentAttemptStatus.PROCESSING,
-               p.providerReference = null,
-               p.failureReason = null,
-               p.updatedAt = CURRENT_TIMESTAMP
-         where p.invoiceId = :invoiceId
-           and p.status = com.einvoicing.payment.application.port.out.dto.PaymentAttemptStatus.FAILED
-        """)
+    @Query(value = """
+    UPDATE payment_attempt
+       SET status = 'PROCESSING',
+           provider_reference = NULL,
+           failure_reason = NULL,
+           updated_at = NOW()
+     WHERE invoice_id = :invoiceId
+       AND status = 'FAILED'
+    """, nativeQuery = true)
     int reopenIfFailed(@Param("invoiceId") UUID invoiceId);
 }
