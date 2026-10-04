@@ -9,5 +9,5 @@ public enum InvoiceStatus {
     APPROVED,
     PAID,
     CANCELLED,
-
+    PAYMENT_FAILED
 }

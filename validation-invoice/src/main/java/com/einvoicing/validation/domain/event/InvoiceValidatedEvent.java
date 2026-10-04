@@ -15,10 +15,10 @@ public class InvoiceValidatedEvent {
 
     public static InvoiceValidatedEvent of(UUID invoiceId, String invoiceNumber,  BigDecimal totalAmount, String currency) {
         InvoiceValidatedEvent event = new InvoiceValidatedEvent();
-        event.eventId = invoiceId;
+        event.eventId = UUID.randomUUID();
         event.invoiceNumber = invoiceNumber;
         event.validatedAt = Instant.now();
-        event.invoiceId = UUID.randomUUID();
+        event.invoiceId = invoiceId;
         event.totalAmount = totalAmount;
         event.currency = currency;
         return event;
