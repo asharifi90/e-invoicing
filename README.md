@@ -27,7 +27,7 @@ Built as a **multi-module Maven** project with a **hexagonal / DDD-style** layou
 - Outbox publish metrics (Micrometer / Actuator)
 - Payment step after approval (simulated provider)
 - Resilience4j on payment provider (retry + circuit breaker + fallback)
-- Payment idempotency (same invoiceId not charged twice; in-memory store for demo)
+- payment idempotency → Postgres payment_attempt
 - DLQ: failed `invoice.approved` processing → `invoice.approved.DLT`
 
 ## Tech stack
