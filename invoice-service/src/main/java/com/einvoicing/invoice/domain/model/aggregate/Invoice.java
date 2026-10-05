@@ -128,6 +128,13 @@ public class Invoice {
         this.rejectionReason = reason;
     }
 
+    public void markPaid(String providerReference) {
+        if (this.status == InvoiceStatus.PAID) {
+            return;
+        }
+        this.status = InvoiceStatus.PAID;
+    }
+
     public InvoiceId getId() {
         return id;
     }
