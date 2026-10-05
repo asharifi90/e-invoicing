@@ -8,7 +8,7 @@ Built as a **multi-module Maven** project with a **hexagonal / DDD-style** layou
 
 | Module | Role |
 |--------|------|
-| **invoice-service** | REST API, PostgreSQL, publish `InvoiceReceivedEvent` |
+| **invoice-service** | REST API, PostgreSQL, publish `InvoiceReceivedEvent`, consume `payment.failed` -> PAID, consume `payment.succeeded` -> PAYMENT_FAILED|
 | **validation-invoice** | Consume `invoice.received`, apply rules, publish `invoice.validated` / `invoice.rejected` |
 | **approval-service** | Consume `invoice.validated`, auto/manual approve → `invoice.approved` |
 | **payment-service** | Consume `invoice.approved`, simulated PSP, publish `payment.succeeded` / `payment.failed` |
