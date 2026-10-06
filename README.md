@@ -272,7 +272,11 @@ On push/PR to `main`:
 - [x] DLQ for failed payment consumption (`invoice.approved.DLT`)
 - [x] Payment unit tests (store, use case, gateway, listener)
 - [ ] Integration tests with Testcontainers
-- [ ] Persistent payment store (prod-style) 
+- [ ] Persistent payment store (prod-style)
+- [ ] Integration tests
+- [ ] complete observability
+- [ ] security
+- [ ] spring ai
 
 ## Why this project
 
