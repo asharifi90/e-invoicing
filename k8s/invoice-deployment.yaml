@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: invoice-service
+  labels:
+    app: invoice-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: invoice-service
+  template:
+    metadata:
+      labels:
+        app: invoice-service
+    spec:
+      containers:
+        - name: invoice-service
+          image: invoice-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://host.docker.internal:5432/eInvoice
+            - name: SPRING_DATASOURCE_USERNAME
+              value: invoiceUser
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: invoicePassword
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: host.docker.internal:9092
