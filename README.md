@@ -43,6 +43,16 @@ Built as a **multi-module Maven** project with a **hexagonal / DDD-style** layou
 | Tests | JUnit 5, Mockito, AssertJ |
 | CI | GitHub Actions |
 
+## Cloud (Azure) — target only
+
+Infrastructure-as-code for a future App Service host lives under `infra/azure/`:
+
+- `main.bicep` — Linux Web App + App Service plan (SKU F1 when available) + placeholder App Settings
+- `parameters.dev.json` — dev parameters (name, region `westeurope`)
+
+**Runtime today remains local** (Docker Compose + `mvn spring-boot:run`).
+Nothing is deployed to Azure unless you run an explicit deployment with a valid subscription and budget controls.
+
 ## Design & failure modes
 See [docs/FAILURE_MODES.md](docs/FAILURE_MODES.md).
 
@@ -271,6 +281,8 @@ On push/PR to `main`:
 - [x] Payment idempotency (in-memory demo)
 - [x] DLQ for failed payment consumption (`invoice.approved.DLT`)
 - [x] Payment unit tests (store, use case, gateway, listener)
+- [x] Azure Bicep skeleton (App Service target; not deployed)
+- [ ] Side-effect intent layer (generalised idempotency beyond payment)
 - [ ] Integration tests with Testcontainers
 - [ ] Persistent payment store (prod-style)
 - [ ] Integration tests
