@@ -121,8 +121,14 @@ public class Invoice {
     }
 
     public void markPaymentFailed(String reason) {
+        if (status == InvoiceStatus.PAID) {
+            return;
+        }
         if (this.status == InvoiceStatus.PAYMENT_FAILED) {
             return;
+        }
+        if (status != InvoiceStatus.APPROVED) {
+            throw new IllegalStateException("Cannot mark PAYMENT_FAILED from status " + status);
         }
         this.status = InvoiceStatus.PAYMENT_FAILED;
         this.rejectionReason = reason;
@@ -131,6 +137,9 @@ public class Invoice {
     public void markPaid(String providerReference) {
         if (this.status == InvoiceStatus.PAID) {
             return;
+        }
+        if (status != InvoiceStatus.APPROVED && status != InvoiceStatus.PAYMENT_FAILED) {
+            throw new IllegalStateException("Cannot mark PAID from status " + status);
         }
         this.status = InvoiceStatus.PAID;
     }
