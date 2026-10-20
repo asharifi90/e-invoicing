@@ -30,8 +30,8 @@ public class InvoiceReceivedListener {
             log.info("received InvoiceReceivedEvent with invoice id : {}", event.getInvoiceId());
             validateInvoiceUseCase.validateReceivedEvent(event);
         }catch (JacksonException e){
-            log.error("Invalid message received: {}", message);
-            throw new IllegalArgumentException("Invalid message received: " + message);
+            log.error("Invalid message received", e);
+            throw new IllegalArgumentException("Invalid message received", e);
         }
     }
 }

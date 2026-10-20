@@ -38,7 +38,7 @@ public class KafkaConsumerConfig {
 
     @Bean
     public DefaultErrorHandler kafkaErrorHandler(DeadLetterPublishingRecoverer recoverer) {
-        return new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 2L));
+        return new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 3L));
     }
 
 
