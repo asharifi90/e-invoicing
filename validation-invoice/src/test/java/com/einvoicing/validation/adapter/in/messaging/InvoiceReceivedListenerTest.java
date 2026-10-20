@@ -60,8 +60,30 @@ class InvoiceReceivedListenerTest {
 
         assertThatThrownBy(() -> listener.onMessage(bad))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid message");
+                .hasMessage("Invalid message received")
+                .hasCauseInstanceOf(tools.jackson.core.JacksonException.class);
 
         verify(validateInvoiceUseCase, never()).validateReceivedEvent(any());
+    }
+
+    @Test
+    void onMessage_processingFailure_isRethrown() {
+        String message = """
+                {
+                  "invoiceId":"87a857ee-4182-4cd1-92a5-6cf43320b559",
+                  "invoiceNumber":"INV-2026-001",
+                  "totalAmount":1500.00,
+                  "currency":"EUR",
+                  "createdAt":"2026-08-29T15:59:43.418038Z",
+                  "eventId":"f960d20d-34b7-42bf-b836-9a8fb66f2079"
+                }
+                """;
+        RuntimeException failure = new RuntimeException("validation failed");
+        doThrow(failure).when(validateInvoiceUseCase).validateReceivedEvent(any());
+
+        assertThatThrownBy(() -> listener.onMessage(message))
+                .isSameAs(failure);
+
+        verify(validateInvoiceUseCase).validateReceivedEvent(any());
     }
 }
