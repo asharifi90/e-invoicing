@@ -1,7 +1,7 @@
 package com.einvoicing.payment.application.service;
 
 import com.einvoicing.payment.application.port.out.PaymentIdempotencyStore;
-import com.einvoicing.payment.application.port.out.PaymentResultPublisher;
+import com.einvoicing.payment.application.port.out.OutboxWriter;
 import com.einvoicing.payment.application.port.out.dto.PaymentAttemptStatus;
 import com.einvoicing.payment.application.port.out.dto.PaymentProviderResult;
 import com.einvoicing.payment.domain.event.InvoiceApprovedEvent;
@@ -10,6 +10,7 @@ import com.einvoicing.payment.domain.event.PaymentSucceededEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -31,7 +32,7 @@ class ProcessApprovedInvoiceServiceTest {
     private ResilientPaymentGateway resilientPaymentGateway;
 
     @Mock
-    private PaymentResultPublisher paymentResultPublisher;
+    private OutboxWriter outboxWriter;
 
     private ProcessApprovedInvoiceService service;
 
@@ -41,7 +42,7 @@ class ProcessApprovedInvoiceServiceTest {
     @BeforeEach
     void setUp() {
         service = new ProcessApprovedInvoiceService(
-                paymentResultPublisher,
+                outboxWriter,
                 resilientPaymentGateway,
                 idempotencyStore,
                 paymentMetrics
@@ -75,9 +76,10 @@ class ProcessApprovedInvoiceServiceTest {
         service.handle(event);
 
         verify(resilientPaymentGateway).charge(invoiceId, "INV-1", new BigDecimal("30.00"), "EUR");
-        verify(idempotencyStore).markSucceeded(invoiceId, "SIM-123");
-        verify(paymentResultPublisher).publishSucceeded(any(PaymentSucceededEvent.class));
-        verify(paymentResultPublisher, never()).publishFailed(any());
+        InOrder order = inOrder(idempotencyStore, outboxWriter);
+        order.verify(idempotencyStore).markSucceeded(invoiceId, "SIM-123");
+        order.verify(outboxWriter).enqueue(eq("payment.succeeded"), any(PaymentSucceededEvent.class));
+        verify(outboxWriter, never()).enqueue(eq("payment.failed"), any());
     }
 
 
@@ -92,9 +94,10 @@ class ProcessApprovedInvoiceServiceTest {
 
         service.handle(event);
 
-        verify(idempotencyStore).markFailed(invoiceId, "provider down");
-        verify(paymentResultPublisher).publishFailed(any(PaymentFailedEvent.class));
-        verify(paymentResultPublisher, never()).publishSucceeded(any());
+        InOrder order = inOrder(idempotencyStore, outboxWriter);
+        order.verify(idempotencyStore).markFailed(invoiceId, "provider down");
+        order.verify(outboxWriter).enqueue(eq("payment.failed"), any(PaymentFailedEvent.class));
+        verify(outboxWriter, never()).enqueue(eq("payment.succeeded"), any());
     }
 
 
@@ -114,7 +117,7 @@ class ProcessApprovedInvoiceServiceTest {
         verify(resilientPaymentGateway, never()).charge(any(), any(), any(), any());
         verify(idempotencyStore, never()).markSucceeded(any(), any());
         verify(idempotencyStore, never()).markFailed(any(), any());
-        verify(paymentResultPublisher).publishSucceeded(any(PaymentSucceededEvent.class));
+        verify(outboxWriter).enqueue(eq("payment.succeeded"), any(PaymentSucceededEvent.class));
     }
 
 
@@ -130,8 +133,7 @@ class ProcessApprovedInvoiceServiceTest {
         service.handle(event);
 
         verify(resilientPaymentGateway, never()).charge(any(), any(), any(), any());
-        verify(paymentResultPublisher, never()).publishSucceeded(any());
-        verify(paymentResultPublisher, never()).publishFailed(any());
+        verifyNoInteractions(outboxWriter);
     }
 
 
@@ -148,6 +150,6 @@ class ProcessApprovedInvoiceServiceTest {
 
         verify(resilientPaymentGateway).charge(invoiceId, "INV-1", new BigDecimal("30.00"), "EUR");
         verify(idempotencyStore).markSucceeded(invoiceId, "SIM-RETRY");
-        verify(paymentResultPublisher).publishSucceeded(any(PaymentSucceededEvent.class));
+        verify(outboxWriter).enqueue(eq("payment.succeeded"), any(PaymentSucceededEvent.class));
     }
 }
