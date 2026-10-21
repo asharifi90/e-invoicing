@@ -2,7 +2,7 @@ package com.einvoicing.payment.application.service;
 
 import com.einvoicing.payment.application.port.in.ProcessApprovedInvoiceUseCase;
 import com.einvoicing.payment.application.port.out.PaymentIdempotencyStore;
-import com.einvoicing.payment.application.port.out.PaymentResultPublisher;
+import com.einvoicing.payment.application.port.out.OutboxWriter;
 import com.einvoicing.payment.application.port.out.dto.PaymentAttemptStatus;
 import com.einvoicing.payment.application.port.out.dto.PaymentProviderResult;
 import com.einvoicing.payment.domain.event.InvoiceApprovedEvent;
@@ -11,6 +11,7 @@ import com.einvoicing.payment.domain.event.PaymentSucceededEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
@@ -20,22 +21,23 @@ public class ProcessApprovedInvoiceService implements ProcessApprovedInvoiceUseC
     public static final Logger log = LoggerFactory.getLogger(ProcessApprovedInvoiceService.class);
 
 
-    private final PaymentResultPublisher paymentResultPublisher;
+    private final OutboxWriter outboxWriter;
     private final ResilientPaymentGateway resilientPaymentGateway;
     private final PaymentIdempotencyStore paymentIdempotencyStore;
     private final PaymentMetrics paymentMetrics;
 
-    public ProcessApprovedInvoiceService(PaymentResultPublisher paymentResultPublisher,
+    public ProcessApprovedInvoiceService(OutboxWriter outboxWriter,
                                          ResilientPaymentGateway resilientPaymentGateway,
                                          PaymentIdempotencyStore paymentIdempotencyStore,
                                          PaymentMetrics paymentMetrics) {
-        this.paymentResultPublisher = paymentResultPublisher;
+        this.outboxWriter = outboxWriter;
         this.resilientPaymentGateway = resilientPaymentGateway;
         this.paymentIdempotencyStore = paymentIdempotencyStore;
         this.paymentMetrics = paymentMetrics;
     }
 
     @Override
+    @Transactional
     public void handle(InvoiceApprovedEvent event) {
 
         UUID invoiceId = event.getInvoiceId();
@@ -44,11 +46,8 @@ public class ProcessApprovedInvoiceService implements ProcessApprovedInvoiceUseC
             log.info("Duplicate payment skipped for invoice {} and status {}", invoiceId, paymentAttemptStatus);
             paymentMetrics.duplicateSkipped();
             if (paymentAttemptStatus == PaymentAttemptStatus.SUCCEEDED) {
-                paymentResultPublisher.publishSucceeded(PaymentSucceededEvent.of(
-                        invoiceId,
-                        event.getInvoiceNumber(),
-                        event.getTotalAmount(),
-                        getCurrency(event),
+                outboxWriter.enqueue("payment.succeeded", PaymentSucceededEvent.of(
+                        invoiceId, event.getInvoiceNumber(), event.getTotalAmount(), getCurrency(event),
                         paymentIdempotencyStore.findProviderReference(invoiceId).orElse("IDEMPOTENT-REPLAY")));
             }
             return;
@@ -56,47 +55,35 @@ public class ProcessApprovedInvoiceService implements ProcessApprovedInvoiceUseC
 
         log.info("Processing approved invoice with invoice number: {}", event.getInvoiceNumber());
 
+        PaymentProviderResult result;
         try {
-            PaymentProviderResult result = resilientPaymentGateway.charge(event.getInvoiceId(),
+            result = resilientPaymentGateway.charge(event.getInvoiceId(),
                     event.getInvoiceNumber(),
                     event.getTotalAmount(),
                     getCurrency(event));
-
-            if (result.isSuccess()) {
-                paymentIdempotencyStore.markSucceeded(invoiceId, result.getProviderReference());
-                paymentMetrics.success();
-                paymentResultPublisher.publishSucceeded(
-                        PaymentSucceededEvent.of(event.getInvoiceId(),
-                                event.getInvoiceNumber(),
-                                event.getTotalAmount(),
-                                getCurrency(event),
-                                result.getProviderReference())
-                );
-            } else {
-                paymentIdempotencyStore.markFailed(invoiceId, result.getFailureReason());
-                paymentMetrics.failed();
-                paymentResultPublisher.publishFailed(
-                        PaymentFailedEvent.of(event.getInvoiceId(),
-                                event.getInvoiceNumber(),
-                                result.getFailureReason(),
-                                event.getTotalAmount(),
-                                getCurrency(event))
-                );
-            }
-        }catch (Exception ex) {
+        } catch (Exception ex) {
             log.error("Payment charge failed for invoice {}", invoiceId, ex);
-            paymentIdempotencyStore.markFailed(invoiceId, ex.getMessage());
-            paymentMetrics.failed();
-            paymentResultPublisher.publishFailed(
-                    PaymentFailedEvent.of(
-                            invoiceId,
-                            event.getInvoiceNumber(),
-                            ex.getMessage() != null ? ex.getMessage() : "payment failed",
-                            event.getTotalAmount(),
-                            getCurrency(event)
-                    )
-            );
+            enqueueFailure(event, ex.getMessage() != null ? ex.getMessage() : "payment failed");
+            return;
         }
+
+        if (result.isSuccess()) {
+            paymentIdempotencyStore.markSucceeded(invoiceId, result.getProviderReference());
+            paymentMetrics.success();
+            outboxWriter.enqueue("payment.succeeded", PaymentSucceededEvent.of(
+                    invoiceId, event.getInvoiceNumber(), event.getTotalAmount(), getCurrency(event),
+                    result.getProviderReference()));
+        } else {
+            enqueueFailure(event, result.getFailureReason());
+        }
+    }
+
+    private void enqueueFailure(InvoiceApprovedEvent event, String reason) {
+        paymentIdempotencyStore.markFailed(event.getInvoiceId(), reason);
+        paymentMetrics.failed();
+        outboxWriter.enqueue("payment.failed", PaymentFailedEvent.of(
+                event.getInvoiceId(), event.getInvoiceNumber(), reason, event.getTotalAmount(),
+                getCurrency(event)));
     }
 
     private static String getCurrency(InvoiceApprovedEvent event) {
