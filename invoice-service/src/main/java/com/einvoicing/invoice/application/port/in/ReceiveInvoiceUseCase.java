@@ -9,6 +9,12 @@ public interface ReceiveInvoiceUseCase {
 
     Invoice receive(ReceiveInvoiceCommand command);
 
+    default ReceiveResult receive(ReceiveInvoiceCommand command, String idempotencyKey) {
+        return new ReceiveResult(receive(command), true);
+    }
+
+    record ReceiveResult(Invoice invoice, boolean created) {}
+
     record ReceiveInvoiceCommand(
       String invoiceNumber,
       String sellerVatNumber,

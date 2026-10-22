@@ -9,5 +9,6 @@ public interface InvoiceRepository {
 
     Invoice save(Invoice invoice);
     Optional<Invoice> findById(InvoiceId id);
+    Optional<Invoice> findByInvoiceNumber(String invoiceNumber);
     boolean existsByInvoiceNumber(String invoiceNumber);
 }

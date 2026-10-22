@@ -37,6 +37,12 @@ public class InvoiceRepositoryAdapter implements InvoiceRepository {
     }
 
     @Override
+    public Optional<Invoice> findByInvoiceNumber(String invoiceNumber) {
+        return springDataRepository.findByInvoiceNumber(invoiceNumber)
+                .map(mapper::toDomain);
+    }
+
+    @Override
     public boolean existsByInvoiceNumber(String invoiceNumber) {
         return springDataRepository.existsByInvoiceNumber(invoiceNumber);
     }

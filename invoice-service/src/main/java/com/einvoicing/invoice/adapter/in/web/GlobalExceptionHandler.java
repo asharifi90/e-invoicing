@@ -2,6 +2,7 @@ package com.einvoicing.invoice.adapter.in.web;
 
 import com.einvoicing.invoice.adapter.in.web.dto.ErrorResponse;
 import com.einvoicing.invoice.domain.exception.InvalidInvoiceStateException;
+import com.einvoicing.invoice.domain.exception.IdempotencyKeyConflictException;
 import com.einvoicing.invoice.domain.exception.InvoiceAlreadyExistsException;
 import com.einvoicing.invoice.domain.exception.InvoiceNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,6 +22,18 @@ import java.util.List;
 public class GlobalExceptionHandler {
 
     private final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(IdempotencyKeyConflictException.class)
+    public ResponseEntity<ErrorResponse> handleIdempotencyKeyConflict(
+            IdempotencyKeyConflictException ex,
+            HttpServletRequest request) {
+        return buildErrorResponse(
+                ex.getMessage(),
+                HttpStatus.CONFLICT,
+                request.getRequestURI(),
+                List.of()
+        );
+    }
 
     @ExceptionHandler(InvoiceAlreadyExistsException.class)
     public ResponseEntity<ErrorResponse> handleInvoiceAlreadyExists(

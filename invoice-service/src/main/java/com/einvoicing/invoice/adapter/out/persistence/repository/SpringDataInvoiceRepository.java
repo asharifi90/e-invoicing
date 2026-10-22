@@ -8,4 +8,6 @@ import java.util.UUID;
 public interface SpringDataInvoiceRepository extends JpaRepository<InvoiceJpaEntity, UUID> {
 
     boolean existsByInvoiceNumber(String invoiceNumber);
+
+    java.util.Optional<InvoiceJpaEntity> findByInvoiceNumber(String invoiceNumber);
 }
