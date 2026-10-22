@@ -34,14 +34,19 @@ public class InvoiceController {
     @PostMapping
     @Operation(summary = "create invoice")
     @ApiResponse(responseCode = "201", description = "Created")
+    @ApiResponse(responseCode = "200", description = "Invoice already exists or idempotent replay")
+    @ApiResponse(responseCode = "409", description = "Idempotency key reused with a different request")
     @ApiResponse(responseCode = "401", description = "Unauthorized")
     public ResponseEntity<InvoiceResponse> receiveInvoice(
+            @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody ReceiveInvoiceRequest request) {
 
-        Invoice invoice = receiveInvoiceUseCase.receive(mapper.toCommand(request));
+        ReceiveInvoiceUseCase.ReceiveResult result =
+                receiveInvoiceUseCase.receive(mapper.toCommand(request), idempotencyKey);
+        Invoice invoice = result.invoice();
         InvoiceResponse response = mapper.toResponse(invoice);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK).body(response);
     }
 
     @GetMapping("/{id}")
