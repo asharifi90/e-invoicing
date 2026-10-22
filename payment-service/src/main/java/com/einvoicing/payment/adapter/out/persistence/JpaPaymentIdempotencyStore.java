@@ -2,6 +2,7 @@ package com.einvoicing.payment.adapter.out.persistence;
 
 import com.einvoicing.payment.application.port.out.PaymentIdempotencyStore;
 import com.einvoicing.payment.application.port.out.dto.PaymentAttemptStatus;
+import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,6 +11,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Component
+@Profile("!local & !test")
 public class JpaPaymentIdempotencyStore implements PaymentIdempotencyStore {
 
     private final PaymentAttemptJpaRepository repository;
