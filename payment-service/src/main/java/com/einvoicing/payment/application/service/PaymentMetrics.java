@@ -14,12 +14,15 @@ public class PaymentMetrics {
 
     public PaymentMetrics(MeterRegistry meterRegistry) {
 
+        // payment.charge.success: completed successful charges.
         this.success = Counter.builder("payment.charge.success")
                 .description("successful payment charges")
                 .register(meterRegistry);
+        // payment.charge.failed: completed failed charges.
         this.failed = Counter.builder("payment.charge.failed")
                 .description("failed payment charges")
                 .register(meterRegistry);
+        // payment.charge.duplicate_skipped: duplicate charge attempts skipped.
         this.duplicateSkipped = Counter.builder("payment.charge.duplicate_skipped")
                 .description("duplicate payment charges")
                 .register(meterRegistry);

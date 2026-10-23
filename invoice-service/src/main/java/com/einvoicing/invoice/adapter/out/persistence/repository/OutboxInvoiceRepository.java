@@ -11,6 +11,7 @@ import java.util.UUID;
 
 public interface OutboxInvoiceRepository extends JpaRepository<OutboxEventEntity, UUID> {
 
+    long countByPublishedAtIsNull();
 
     @Query("""
             SELECT e FROM OutboxEventEntity e

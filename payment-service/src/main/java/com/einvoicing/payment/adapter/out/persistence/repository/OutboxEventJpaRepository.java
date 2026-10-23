@@ -10,6 +10,8 @@ import java.util.UUID;
 
 public interface OutboxEventJpaRepository extends JpaRepository<OutboxEventEntity, UUID> {
 
+    long countByPublishedAtIsNull();
+
     @Query("""
             SELECT event FROM OutboxEventEntity event
             WHERE event.publishedAt IS NULL
