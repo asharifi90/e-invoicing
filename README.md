@@ -1,180 +1,133 @@
 # E-Invoicing Platform
 
-Event-driven platform that receives e-invoices, persists them, publishes domain events to Kafka, and validates them in a separate service.
+Multi-module, event-driven backend for processing e-invoices (Java 21, Spring Boot).
 
-Built as a **multi-module Maven** project with a **hexagonal / DDD-style** layout so domain logic stays independent from the web, database, and messaging.
+**Flow:** receive → validate → approve → pay → update invoice status.
+
+Portfolio / learning project aligned with European-style SME invoice workflows. Runtime is **local** (Docker Compose); Azure Bicep under `infra/azure/` is a **target** only.
+
+Repository: https://github.com/asharifi90/e-invoicing
+
+---
+
+## How it works
+
+```text
+                    ┌──────────────────┐
+                    │  Client (HTTP)   │
+                    │  JWT + optional  │
+                    │  Idempotency-Key │
+                    └────────┬─────────┘
+                             │ POST /api/invoices
+                             ▼
+                    ┌──────────────────┐
+                    │ invoice-service  │
+                    │ save Postgres    │
+                    │ outbox → Kafka   │
+                    └────────┬─────────┘
+                             │ invoice.received
+                             ▼
+                    ┌──────────────────┐
+                    │ validation-      │
+                    │ invoice          │
+                    └────────┬─────────┘
+                      ┌──────┴──────┐
+                      │             │
+            invoice.validated   invoice.rejected
+                      │             │
+                      ▼             ▼
+            ┌─────────────────┐   (end)
+            │ approval-service│
+            │ auto or manual  │
+            └────────┬────────┘
+                     │ invoice.approved
+                     ▼
+            ┌─────────────────┐
+            │ payment-service │
+            │ PSP (simulated) │
+            │ + resilience    │
+            └────────┬────────┘
+              ┌──────┴──────┐
+              │             │
+   payment.succeeded   payment.failed
+              │             │
+              ▼             ▼
+            ┌─────────────────────────┐
+            │ invoice-service         │
+            │ status → PAID           │
+            │      or PAYMENT_FAILED │
+            └─────────────────────────┘
+```
+
+### Mermaid (renders on GitHub)
+
+```mermaid
+flowchart TD
+  A[Client JWT] -->|POST /api/invoices| B[invoice-service]
+  B -->|persist + outbox| C[(PostgreSQL)]
+  B -->|invoice.received| D[validation-invoice]
+  D -->|invoice.validated| E[approval-service]
+  D -->|invoice.rejected| X[Stop]
+  E -->|invoice.approved| F[payment-service]
+  F -->|payment.succeeded| G[invoice-service: PAID]
+  F -->|payment.failed| H[invoice-service: PAYMENT_FAILED]
+```
+
+---
 
 ## Modules
 
-| Module | Role |
-|--------|------|
-| **invoice-service** | REST API, PostgreSQL, publish `InvoiceReceivedEvent`, consume `payment.failed` -> PAYMENT_FAILED, consume `payment.succeeded` -> PAID|
-| **validation-invoice** | Consume `invoice.received`, apply rules, publish `invoice.validated` / `invoice.rejected` |
-| **approval-service** | Consume `invoice.validated`, auto/manual approve → `invoice.approved` |
-| **payment-service** | Consume `invoice.approved`, simulated PSP, publish `payment.succeeded` / `payment.failed` |
+| Module | Port | Responsibility |
+|--------|------|----------------|
+| **invoice-service** | 8080 | REST intake, DB, outbox, reacts to payment results |
+| **validation-invoice** | 8081 | Business rules on `invoice.received` |
+| **approval-service** | 8082 | Auto / manual approval |
+| **payment-service** | 8083 | Simulated payment provider |
 
-## Features
+Architecture style: **hexagonal / DDD-oriented** (domain independent from web, DB, Kafka).
 
-- Receive invoice via REST (`POST /api/invoices`) with **JWT** authentication
-- Get invoice by id (`GET /api/invoices/{id}`)
-- Persist invoices in PostgreSQL (Flyway migrations)
-- Publish domain events to **Apache Kafka**
-- Asynchronous validation service
-- Approval: auto under threshold or manual via API
-- Unit tests (domain, application, listeners) + **GitHub Actions** CI
-- Transactional outbox for `InvoiceReceived` (DB + async Kafka publish)
-- HTTP correlation id (`X-Correlation-Id`) in logs
-- Outbox publish metrics (Micrometer / Actuator)
-- Payment step after approval (simulated provider)
-- Resilience4j on payment provider (retry + circuit breaker + fallback)
-- payment idempotency → Postgres payment_attempt
-- DLQ: failed `invoice.approved` processing → `invoice.approved.DLT`
+---
 
-## Tech stack
+## Quick start
 
-| Area | Choice |
-|------|--------|
-| Language | Java 21 |
-| Framework | Spring Boot 3.x / 4.x |
-| Architecture | Hexagonal (domain / application / adapters), multi-module |
-| Database | PostgreSQL + Flyway |
-| Messaging | Apache Kafka |
-| Local infra | Docker Compose |
-| Tests | JUnit 5, Mockito, AssertJ |
-| CI | GitHub Actions |
-
-## Cloud (Azure) — target only
-
-Infrastructure-as-code for a future App Service host lives under `infra/azure/`:
-
-- `main.bicep` — Linux Web App + App Service plan (SKU F1 when available) + placeholder App Settings
-- `parameters.dev.json` — dev parameters (name, region `westeurope`)
-
-**Runtime today remains local** (Docker Compose + `mvn spring-boot:run`).
-Nothing is deployed to Azure unless you run an explicit deployment with a valid subscription and budget controls.
-
-## Design & failure modes
-See [docs/FAILURE_MODES.md](docs/FAILURE_MODES.md).
-
-## Architecture
-
-```text
-Client
-  → POST /api/auth/login          → JWT
-  → POST /api/invoices (+ Bearer)
-  → invoice-service saves invoice + outbox row
-  → job publishes to Kafka: invoice.received
-  → validation-invoice
-       → invoice.validated  OR  invoice.rejected
-  → approval-service (on validated)
-       → if amount < threshold  → invoice.approved (AUTO)
-       → else → store pending + invoice.approval-required
-            → POST /api/approvals/{invoiceId}/approve
-            → invoice.approved (MANUAL)
-→ payment-service → charge (Resilience4j + idempotency)
-       → payment.succeeded | payment.failed
-```
-
-```text
-invoice-service
-  adapter/in/web          → REST + JWT
-  application             → use cases + ports
-  domain                  → Invoice aggregate, events
-  adapter/out/persistence → JPA + outbox table
-  adapter/out/messaging   → OutboxPublisherJob → Kafka
-
-validation-invoice
-  adapter/in/messaging    → Kafka listener
-  application / domain    → rules
-  adapter/out/messaging   → Kafka publisher
-
-approval-service
-  adapter/in/messaging    → Kafka listener
-  adapter/in/web          → manual approve API
-  application / domain    → policy + pending store (in-memory demo)
-  adapter/out/messaging   → Kafka publisher
-
-payment-service
-  resilient charge (retry / circuit breaker)
-  idempotency guard on invoiceId
-  payment.succeeded  OR  payment.failed
-```
-
-## Run locally
-
-### 1. Start infrastructure
+### 1. Infrastructure
 
 ```bash
 docker compose up -d
 ```
 
-| Service | URL / port |
-|---------|------------|
-| PostgreSQL | `localhost:5432` (or `5433` if remapped) |
-| Kafka | `localhost:9092` |
-| Kafka UI | http://localhost:8090 (if enabled) |
+Starts PostgreSQL and Kafka (and Kafka UI if configured in compose).
 
-### 2. Start the three applications
-
-From the **repo root** (parent POM):
+### 2. Build
 
 ```bash
-# Terminal 1
-mvn spring-boot:run -pl invoice-service
-
-# Terminal 2
-mvn spring-boot:run -pl validation-invoice
-
-# Terminal 3
-mvn spring-boot:run -pl approval-service
-
-# Terminal 4
-mvn spring-boot:run -pl payment-service
+mvn -B clean package -DskipTests
 ```
 
-| Service | Base URL |
-|---------|----------|
-| invoice-service | http://localhost:8080 |
-| validation-invoice | http://localhost:8081 |
-| approval-service | http://localhost:8082 |
+### 3. Run each service
 
-## Authentication (JWT)
+```bash
+mvn -pl invoice-service spring-boot:run
+mvn -pl validation-invoice spring-boot:run
+mvn -pl approval-service spring-boot:run
+mvn -pl payment-service spring-boot:run
+```
 
-Demo user (in-memory): **`demo` / `demo123`**
-
-### Login
+### 4. Login + create invoice
 
 ```http
 POST http://localhost:8080/api/auth/login
 Content-Type: application/json
+
+{ "username": "demo", "password": "demo123" }
 ```
-
-```json
-{
-  "username": "demo",
-  "password": "demo123"
-}
-```
-
-Response includes a Bearer token. Use it on protected invoice endpoints:
-
-```http
-Authorization: Bearer <jwt-token>
-```
-
-Without a valid token → `401 Unauthorized`.
-
-## Example API calls
-
-### Create invoice
 
 ```http
 POST http://localhost:8080/api/invoices
-Authorization: Bearer <jwt-token>
+Authorization: Bearer <token>
 Content-Type: application/json
-```
+Idempotency-Key: <optional-uuid>
 
-```json
 {
   "invoiceNumber": "INV-2026-001",
   "sellerVatNumber": "BE0123456789",
@@ -190,116 +143,81 @@ Content-Type: application/json
 }
 ```
 
-### Get invoice
-
 ```http
 GET http://localhost:8080/api/invoices/{id}
-Authorization: Bearer <jwt-token>
+Authorization: Bearer <token>
 ```
 
-### Manual approval (when amount ≥ auto-approve threshold, e.g. 1000 EUR)
+- Swagger UI: http://localhost:8080/swagger-ui/index.html  
+- Demo credentials are for local use only.
 
-```http
-POST http://localhost:8082/api/approvals/{invoiceId}/approve
-```
-
-→ publishes `invoice.approved` with mode `MANUAL`.
-
-Pending approvals are kept **in memory** for the demo (restart clears them). Production would use a database.
-
-## API documentation (Swagger)
-
-With `invoice-service` running:
-
-- Swagger UI: http://localhost:8080/swagger-ui/index.html
-- OpenAPI JSON: http://localhost:8080/v3/api-docs
+---
 
 ## Kafka topics
 
-| Topic | Producer | Meaning |
-|-------|----------|---------|
-| `invoice.received` | invoice-service | Invoice accepted and stored |
-| `invoice.validated` | validation-invoice | Passed business rules |
-| `invoice.rejected` | validation-invoice | Failed business rules |
-| `invoice.approval-required` | approval-service | Needs human approval |
-| `invoice.approved` | approval-service | Approved (AUTO or MANUAL) |
-| `payment.succeeded` | payment-service | Payment completed (simulated PSP) |
-| `payment.failed`   | payment-service | Payment failed after provider/fallback |
-| invoice.approved.DLT | payment-service (error handler) | Poison messages after retries |
+| Topic | Meaning |
+|-------|---------|
+| `invoice.received` | Invoice stored |
+| `invoice.validated` / `invoice.rejected` | Validation outcome |
+| `invoice.approved` | Approved (auto or manual) |
+| `payment.succeeded` / `payment.failed` | Payment outcome |
+| `*.DLT` | Dead-letter after repeated consumer failures |
 
-## Reliability notes
-- Outbox avoids dual-write between Postgres and Kafka for invoice intake.
-- Use `X-Correlation-Id` to trace a request in logs; metrics: `/actuator/metrics/outbox.published`.
-- Payment calls go through Resilience4j (retry, circuit breaker, fallback).
-- Duplicate `invoice.approved` deliveries are ignored for the same invoiceId (in-memory idempotency store; production would use a DB unique key).
-- Invalid or repeatedly failing `invoice.approved` messages are redirected to `invoice.approved.DLT` so the main consumer can continue.
+---
 
-## Tests
+## Reliability (short)
 
-From repo root:
+| Concern | Approach |
+|---------|----------|
+| DB vs Kafka dual-write | Transactional **outbox** (invoice intake; payment results where implemented) |
+| Double payment | **Idempotency** on `invoiceId` (`payment_attempt`) |
+| Provider errors / slowness | **Resilience4j** (retry, circuit breaker, fallback) |
+| Poison messages | **DLQ** on consumers |
+| HTTP retries | Optional **Idempotency-Key**; existing invoice number returns same invoice + **status** |
+| Tracing in logs | **X-Correlation-Id** |
+| Ops signals | Actuator / Micrometer (e.g. outbox published & unpublished) |
+
+Design notes: [`docs/FAILURE_MODES.md`](docs/FAILURE_MODES.md)
+
+---
+
+## Tech stack
+
+| Area | Choice |
+|------|--------|
+| Language | Java 21 |
+| Framework | Spring Boot |
+| Architecture | Multi-module, hexagonal-style |
+| DB | PostgreSQL + Flyway |
+| Messaging | Apache Kafka |
+| Security | JWT |
+| CI | GitHub Actions |
+| Local infra | Docker Compose |
+| Cloud (target) | Azure Bicep → App Service (`infra/azure/`) |
+
+---
+
+## Tests & CI
 
 ```bash
 mvn test
-```
-
-Examples:
-
-```bash
 mvn test -pl invoice-service
-mvn test -pl validation-invoice
-mvn test -pl approval-service
-mvn test -pl payment-service
 ```
 
-Focus: domain rules and use cases with mocked ports (no Postgres/Kafka required in unit tests).  
-**Green CI** = `mvn clean test` passed on GitHub Actions.
+On push/PR to `main`, GitHub Actions runs the build and tests.
 
-## CI
-
-On push/PR to `main`:
-
-1. Checkout  
-2. Java 21  
-3. `mvn clean test`  
+---
 
 ## Project status
 
-- [x] Invoice receive + persistence + Kafka event  
-- [x] GET by id  
-- [x] JWT authentication (demo user)  
-- [x] Validation service  
-- [x] Approval service (auto + manual API)  
-- [x] Unit tests + multi-module structure  
-- [x] GitHub Actions CI
-- [x] Swagger / OpenAPI (springdoc) on invoice-service
-- [x] Docker images for the apps  
-- [x] Transactional outbox (custom) for invoice.received
-- [x] Correlation ID filter + log pattern
-- [x] Outbox metrics (published / failed)
-- [x] Payment service (simulated provider)
-- [x] Resilience4j (retry + circuit breaker) on payment
-- [x] Payment idempotency (in-memory demo)
-- [x] DLQ for failed payment consumption (`invoice.approved.DLT`)
-- [x] Payment unit tests (store, use case, gateway, listener)
-- [x] Azure Bicep skeleton (App Service target; not deployed)
-- [ ] Side-effect intent layer (generalised idempotency beyond payment)
-- [ ] Integration tests with Testcontainers
-- [ ] Persistent payment store (prod-style)
-- [ ] Integration tests
-- [ ] complete observability
-- [ ] security
-- [ ] spring ai
+- [x] Full path: intake → validation → approval → payment → PAID / PAYMENT_FAILED  
+- [x] Outbox, payment idempotency, Resilience4j, DLQ, correlation id, basic metrics  
+- [x] JWT + Swagger on invoice API  
+- [x] Azure IaC skeleton (not deployed by default)  
+- [ ] Broader integration tests / full monitoring stack (Prometheus/Grafana) as optional next steps  
 
-## Why this project
-
-Demonstrates a realistic European-style backend:
-
-- Clear boundaries (hexagonal / DDD-style)  
-- Event-driven microservices with Kafka  
-- Security (JWT) on the public API  
-- Automated tests and CI  
-- A full business flow: intake → validate → approve  
+---
 
 ## License / note
 
-Portfolio / learning project. Demo credentials and in-memory stores are not for production use.
+Learning and portfolio project. Not production-certified. Do not commit real secrets; demo users and in-memory pieces are for local demos only.
