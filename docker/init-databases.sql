@@ -1,0 +1,2 @@
+CREATE DATABASE e_invoice;
+CREATE DATABASE payment;

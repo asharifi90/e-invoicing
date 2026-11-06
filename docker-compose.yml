@@ -3,13 +3,13 @@ services:
     image: postgres:16-alpine
     container_name: e-invoice-postgres
     environment:
-      POSTGRES_DB: eInvoice
       POSTGRES_USER: invoiceUser
       POSTGRES_PASSWORD: invoicePassword
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-databases.sql:/docker-entrypoint-initdb.d/01-init-databases.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U invoiceUser -d eInvoice"]
       interval: 5s
