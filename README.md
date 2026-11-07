@@ -172,8 +172,9 @@ On push/PR to `main`, GitHub Actions runs the build and tests.
 - [x] Full path: intake → validation → approval → payment → PAID / PAYMENT_FAILED  
 - [x] Outbox, payment idempotency, Resilience4j, DLQ, correlation id, basic metrics  
 - [x] JWT + Swagger on invoice API  
-- [x] Azure IaC skeleton (not deployed by default)  
-- [ ] Broader integration tests / full monitoring stack (Prometheus/Grafana) as optional next steps  
+- [x] Azure IaC skeleton (not deployed by default)
+- [x] Prometheus / Grafana lab (payment + outbox metrics)
+- [ ] Broader integration tests
 
 ---
 
