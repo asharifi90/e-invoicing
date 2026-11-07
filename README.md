@@ -12,53 +12,6 @@ Repository: https://github.com/asharifi90/e-invoicing
 
 ## How it works
 
-```text
-                    ┌──────────────────┐
-                    │  Client (HTTP)   │
-                    │  JWT + optional  │
-                    │  Idempotency-Key │
-                    └────────┬─────────┘
-                             │ POST /api/invoices
-                             ▼
-                    ┌──────────────────┐
-                    │ invoice-service  │
-                    │ save Postgres    │
-                    │ outbox → Kafka   │
-                    └────────┬─────────┘
-                             │ invoice.received
-                             ▼
-                    ┌──────────────────┐
-                    │ validation-      │
-                    │ invoice          │
-                    └────────┬─────────┘
-                      ┌──────┴──────┐
-                      │             │
-            invoice.validated   invoice.rejected
-                      │             │
-                      ▼             ▼
-            ┌─────────────────┐   (end)
-            │ approval-service│
-            │ auto or manual  │
-            └────────┬────────┘
-                     │ invoice.approved
-                     ▼
-            ┌─────────────────┐
-            │ payment-service │
-            │ PSP (simulated) │
-            │ + resilience    │
-            └────────┬────────┘
-              ┌──────┴──────┐
-              │             │
-   payment.succeeded   payment.failed
-              │             │
-              ▼             ▼
-            ┌─────────────────────────┐
-            │ invoice-service         │
-            │ status → PAID           │
-            │      or PAYMENT_FAILED │
-            └─────────────────────────┘
-```
-
 ### Mermaid (renders on GitHub)
 
 ```mermaid
