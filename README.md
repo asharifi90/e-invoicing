@@ -161,6 +161,12 @@ On push/PR to `main`, GitHub Actions runs the build and tests.
 
 ---
 
+## Observability (local lab)
+
+- Micrometer metrics + Prometheus scrape + Grafana dashboards
+- Lab scenarios (payment fail, outbox publish fail): see [docs/LAB.md](docs/LAB.md)
+- Prometheus: `localhost:9090` · Grafana: `localhost:3000`
+
 ## Project status
 
 - [x] Full path: intake → validation → approval → payment → PAID / PAYMENT_FAILED  
