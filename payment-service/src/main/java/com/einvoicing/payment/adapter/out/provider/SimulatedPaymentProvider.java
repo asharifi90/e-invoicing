@@ -15,7 +15,7 @@ public class SimulatedPaymentProvider implements PaymentProvider {
     private final String mode;
     private final long slowMs;
 
-    public SimulatedPaymentProvider(@Value("${app.payment.mode:SUCCESS}") String mode,
+    public SimulatedPaymentProvider(@Value("${app.payment.mode:FAIL}") String mode,
                                     @Value("${app.payment.slow-ms:3000}") long slowMs) {
         this.mode = mode;
         this.slowMs = slowMs;

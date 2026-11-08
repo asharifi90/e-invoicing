@@ -22,7 +22,7 @@ public class ResilientPaymentGateway {
         this.paymentProvider = paymentProvider;
     }
 
-    @CircuitBreaker(name = "paymentProvider", fallbackMethod = "chargeFallback")
+    @CircuitBreaker(name = "paymentProvider")
     @Retry(name = "paymentProvider", fallbackMethod = "chargeFallback")
     public PaymentProviderResult charge(UUID invoiceId, String invoiceNumber, BigDecimal amount, String currency) {
         return paymentProvider.charge(invoiceId, invoiceNumber, amount, currency);
