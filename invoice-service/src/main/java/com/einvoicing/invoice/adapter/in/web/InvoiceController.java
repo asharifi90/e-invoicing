@@ -7,6 +7,7 @@ import com.einvoicing.invoice.application.port.in.GetInvoiceUseCase;
 import com.einvoicing.invoice.application.port.in.ReceiveInvoiceUseCase;
 import com.einvoicing.invoice.domain.model.aggregate.Invoice;
 import com.einvoicing.invoice.domain.model.valueObject.InvoiceId;
+import io.micrometer.tracing.Tracer;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
@@ -23,12 +24,15 @@ public class InvoiceController {
     private final ReceiveInvoiceUseCase receiveInvoiceUseCase;
     private final InvoiceWebMapper mapper;
     private final GetInvoiceUseCase getInvoiceUseCase;
+    private final Tracer tracer;
 
     public InvoiceController(ReceiveInvoiceUseCase receiveInvoiceUseCase,
-                             InvoiceWebMapper mapper, GetInvoiceUseCase getInvoiceUseCase) {
+                             InvoiceWebMapper mapper, GetInvoiceUseCase getInvoiceUseCase,
+                             Tracer tracer) {
         this.receiveInvoiceUseCase = receiveInvoiceUseCase;
         this.mapper = mapper;
         this.getInvoiceUseCase = getInvoiceUseCase;
+        this.tracer = tracer;
     }
 
     @PostMapping
@@ -41,12 +45,22 @@ public class InvoiceController {
             @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody ReceiveInvoiceRequest request) {
 
-        ReceiveInvoiceUseCase.ReceiveResult result =
-                receiveInvoiceUseCase.receive(mapper.toCommand(request), idempotencyKey);
-        Invoice invoice = result.invoice();
-        InvoiceResponse response = mapper.toResponse(invoice);
+        var span = tracer.nextSpan().name("receive-invoice-controller").start();
+        try (Tracer.SpanInScope ws = tracer.withSpan(span)) {
+            span.tag("invoice.number", request.invoiceNumber());
 
-        return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK).body(response);
+            ReceiveInvoiceUseCase.ReceiveResult result =
+                    receiveInvoiceUseCase.receive(mapper.toCommand(request), idempotencyKey);
+            Invoice invoice = result.invoice();
+            InvoiceResponse response = mapper.toResponse(invoice);
+
+            return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK).body(response);
+        } catch (RuntimeException e) {
+            span.error(e);
+            throw e;
+        } finally {
+            span.end();
+        }
     }
 
     @GetMapping("/{id}")

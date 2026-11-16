@@ -4,6 +4,7 @@ import com.einvoicing.payment.adapter.out.persistence.entity.OutboxEventEntity;
 import com.einvoicing.payment.adapter.out.persistence.repository.OutboxEventJpaRepository;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.opentelemetry.api.trace.Tracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;

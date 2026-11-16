@@ -2,7 +2,11 @@ package com.einvoicing.validation.adapter.in.messaging;
 
 import com.einvoicing.validation.application.port.in.ValidateInvoiceUseCase;
 import com.einvoicing.validation.application.port.out.ProcessedEventStore;
+import com.einvoicing.validation.config.TracingKafkaSupport;
 import com.einvoicing.validation.domain.event.InvoiceReceivedEvent;
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -18,37 +22,49 @@ public class InvoiceReceivedListener {
     private final ValidateInvoiceUseCase validateInvoiceUseCase;
     private final ObjectMapper objectMapper;
     private final ProcessedEventStore processedEventStore;
+    private final TracingKafkaSupport tracingKafkaSupport;
+    private final Tracer tracer;
 
     public InvoiceReceivedListener(ValidateInvoiceUseCase validateInvoiceUseCase,
                                    ObjectMapper objectMapper,
-                                   ProcessedEventStore processedEventStore) {
+                                   ProcessedEventStore processedEventStore,
+                                   TracingKafkaSupport tracingKafkaSupport, Tracer tracer) {
         this.validateInvoiceUseCase = validateInvoiceUseCase;
         this.objectMapper = objectMapper;
         this.processedEventStore = processedEventStore;
+        this.tracingKafkaSupport = tracingKafkaSupport;
+        this.tracer = tracer;
     }
 
     @KafkaListener(topics = "invoice.received", groupId = "validation-invoice")
-    public void onMessage(String message) {
-        InvoiceReceivedEvent event;
-        try {
-            event = objectMapper.readValue(message, InvoiceReceivedEvent.class);
-        } catch (JacksonException e) {
-            log.error("Invalid message received", e);
-            throw new IllegalArgumentException("Invalid message received", e);
-        }
+    public void onMessage(ConsumerRecord<String, String> record) {
+        Span span = tracingKafkaSupport.startConsumerSpan("validate-invoice", record);
+        try (Tracer.SpanInScope scope = tracer.withSpan(span)) {
+            InvoiceReceivedEvent event;
+            try {
+                event = objectMapper.readValue(record.value(), InvoiceReceivedEvent.class);
+            } catch (JacksonException e) {
+                log.error("Invalid message received", e);
+                span.error(e);
+                throw new IllegalArgumentException("Invalid message received", e);
+            }
+            span.tag("invoiceId", String.valueOf(event.getInvoiceId()));
+            log.info("received InvoiceReceivedEvent with invoice id : {}", event.getInvoiceId());
 
-        log.info("received InvoiceReceivedEvent with invoice id : {}", event.getInvoiceId());
-
-        String eventKey = "invoice.received:" + event.getInvoiceId();
-        if (!processedEventStore.tryClaim(eventKey)) {
-            log.info("Skipping duplicate InvoiceReceivedEvent with invoice id: {}", event.getInvoiceId());
-            return;
-        }
-        try {
-            validateInvoiceUseCase.validateReceivedEvent(event);
-        } catch (RuntimeException | Error e) {
-            processedEventStore.release(eventKey);
-            throw e;
+            String eventKey = "invoice.received:" + event.getInvoiceId();
+            if (!processedEventStore.tryClaim(eventKey)) {
+                log.info("Skipping duplicate InvoiceReceivedEvent with invoice id: {}", event.getInvoiceId());
+                return;
+            }
+            try {
+                validateInvoiceUseCase.validateReceivedEvent(event);
+            } catch (RuntimeException | Error e) {
+                processedEventStore.release(eventKey);
+                span.error(e);
+                throw e;
+            }
+        }finally {
+            span.end();
         }
     }
 }

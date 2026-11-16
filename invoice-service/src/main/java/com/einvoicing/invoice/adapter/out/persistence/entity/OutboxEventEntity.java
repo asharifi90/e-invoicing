@@ -33,6 +33,9 @@ public class OutboxEventEntity {
     @Column(name = "published_at")
     private Instant publishedAt;
 
+    @Column(name = "traceparent")
+    private String traceParent;
+
     public static OutboxEventEntity create(
             String aggregatedType, String aggregatedId, String eventType, String payload
     ){
@@ -44,6 +47,14 @@ public class OutboxEventEntity {
         entity.payload = payload;
         entity.createdAt = Instant.now();
         return entity;
+    }
+
+    public void setTraceParent(String traceParent) {
+        this.traceParent = traceParent;
+    }
+
+    public String getTraceParent() {
+        return traceParent;
     }
 
     public void setPublishedAt() {
