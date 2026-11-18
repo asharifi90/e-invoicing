@@ -121,14 +121,11 @@ public class Invoice {
     }
 
     public void markPaymentFailed(String reason) {
-        if (status == InvoiceStatus.PAID) {
-            return;
+        if (this.status == InvoiceStatus.PAID || this.status == InvoiceStatus.PAYMENT_FAILED) {
+            return; // Idempotent
         }
-        if (this.status == InvoiceStatus.PAYMENT_FAILED) {
-            return;
-        }
-        if (status != InvoiceStatus.APPROVED) {
-            throw new IllegalStateException("Cannot mark PAYMENT_FAILED from status " + status);
+        if (this.status == InvoiceStatus.REJECTED) {
+            throw new InvalidInvoiceStateException("Cannot mark PAYMENT_FAILED for a REJECTED invoice");
         }
         this.status = InvoiceStatus.PAYMENT_FAILED;
         this.rejectionReason = reason;
@@ -136,12 +133,13 @@ public class Invoice {
 
     public void markPaid(String providerReference) {
         if (this.status == InvoiceStatus.PAID) {
-            return;
+            return; // Idempotent
         }
-        if (status != InvoiceStatus.APPROVED && status != InvoiceStatus.PAYMENT_FAILED) {
-            throw new IllegalStateException("Cannot mark PAID from status " + status);
+        if (this.status == InvoiceStatus.REJECTED) {
+            throw new InvalidInvoiceStateException("Cannot mark PAID for a REJECTED invoice");
         }
         this.status = InvoiceStatus.PAID;
+        this.rejectionReason = null; // Clear any previous transient payment failure reason
     }
 
     public InvoiceId getId() {

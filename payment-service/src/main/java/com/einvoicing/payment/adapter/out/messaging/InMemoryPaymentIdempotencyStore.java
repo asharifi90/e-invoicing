@@ -53,7 +53,7 @@ public class InMemoryPaymentIdempotencyStore implements PaymentIdempotencyStore 
 
     @Override
     public boolean tryBegin(UUID invoiceId, String invoiceNumber) {
-        return false;
+        return tryBegin(invoiceId);
     }
 
     @Override
@@ -63,7 +63,7 @@ public class InMemoryPaymentIdempotencyStore implements PaymentIdempotencyStore 
 
     @Override
     public void markFailed(UUID invoiceId, String reason) {
-        store.put(invoiceId, new Entry(PaymentAttemptStatus.FAILED, reason, null));
+        store.put(invoiceId, new Entry(PaymentAttemptStatus.FAILED, null, reason));
     }
 
     @Override

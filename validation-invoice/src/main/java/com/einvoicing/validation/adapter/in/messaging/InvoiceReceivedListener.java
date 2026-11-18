@@ -2,7 +2,6 @@ package com.einvoicing.validation.adapter.in.messaging;
 
 import com.einvoicing.validation.application.port.in.ValidateInvoiceUseCase;
 import com.einvoicing.validation.application.port.out.ProcessedEventStore;
-import com.einvoicing.validation.config.TracingKafkaSupport;
 import com.einvoicing.validation.domain.event.InvoiceReceivedEvent;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
@@ -22,23 +21,21 @@ public class InvoiceReceivedListener {
     private final ValidateInvoiceUseCase validateInvoiceUseCase;
     private final ObjectMapper objectMapper;
     private final ProcessedEventStore processedEventStore;
-    private final TracingKafkaSupport tracingKafkaSupport;
     private final Tracer tracer;
 
     public InvoiceReceivedListener(ValidateInvoiceUseCase validateInvoiceUseCase,
                                    ObjectMapper objectMapper,
                                    ProcessedEventStore processedEventStore,
-                                   TracingKafkaSupport tracingKafkaSupport, Tracer tracer) {
+                                   Tracer tracer) {
         this.validateInvoiceUseCase = validateInvoiceUseCase;
         this.objectMapper = objectMapper;
         this.processedEventStore = processedEventStore;
-        this.tracingKafkaSupport = tracingKafkaSupport;
         this.tracer = tracer;
     }
 
     @KafkaListener(topics = "invoice.received", groupId = "validation-invoice")
     public void onMessage(ConsumerRecord<String, String> record) {
-        Span span = tracingKafkaSupport.startConsumerSpan("validate-invoice", record);
+        Span span = tracer.nextSpan().name("validate-invoice").start();
         try (Tracer.SpanInScope scope = tracer.withSpan(span)) {
             InvoiceReceivedEvent event;
             try {

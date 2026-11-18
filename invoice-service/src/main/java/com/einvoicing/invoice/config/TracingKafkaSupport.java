@@ -29,31 +29,20 @@ public class TracingKafkaSupport {
     /** Call only while a span is active (e.g. inside receive). */
     public String currentTraceParent() {
         Span current = tracer.currentSpan();
-        log.info("currentSpan={}", current);
         if (current == null) {
             return null;
         }
-
-        var ctx = current.context();
-        String traceId = ctx.traceId();
-        String spanId = ctx.spanId();
-        if (traceId == null || traceId.isBlank() || spanId == null || spanId.isBlank()) {
-            return null;
-        }
-
-        // W3C: version - traceid - spanid - flags (01 = sampled)
-        String sampled = Boolean.TRUE.equals(ctx.sampled()) ? "01" : "00";
-        String traceparent = "00-" + traceId + "-" + spanId + "-" + sampled;
-        log.info("traceParent={}", traceparent);
-        return traceparent;
+        Map<String, String> carrier = new HashMap<>();
+        propagator.inject(current.context(), carrier, Map::put);
+        return carrier.get("traceparent");
     }
 
     public void putTraceParent(ProducerRecord<String, String> record, String traceParent) {
         if (traceParent == null || traceParent.isBlank()) {
             return;
         }
-        record.headers().remove("traceParent");
-        record.headers().add("traceParent", traceParent.getBytes(StandardCharsets.UTF_8));
+        record.headers().remove("traceparent");
+        record.headers().add("traceparent", traceParent.getBytes(StandardCharsets.UTF_8));
     }
 
     public Span startConsumerSpan(String name, ConsumerRecord<?, ?> record) {

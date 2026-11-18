@@ -2,11 +2,11 @@ package com.einvoicing.invoice.adapter.in.messaging;
 
 import com.einvoicing.invoice.application.port.in.MarkPaymentSucceededUseCase;
 import com.einvoicing.invoice.domain.event.PaymentSucceededEvent;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class PaymentSucceededListener {
@@ -34,7 +34,7 @@ public class PaymentSucceededListener {
                 payload = objectMapper.readValue(payload, String.class);
             }
             PaymentSucceededEvent event =
-                    objectMapper.readValue(payload, PaymentSucceededEvent.class);
+                    deserialize(payload, PaymentSucceededEvent.class);
 
             log.info("Received payment.succeeded for invoice {}", event.getInvoiceId());
             markPaymentSucceededUseCase.markPaid(
@@ -44,5 +44,13 @@ public class PaymentSucceededListener {
             log.error("Failed to process payment.succeeded: {}", message, e);
             throw new IllegalArgumentException("Invalid payment.succeeded message", e);
         }
+    }
+
+    private <T> T deserialize(String message, Class<T> targetType) throws Exception {
+        String payload = message;
+        if (payload != null && payload.startsWith("\"")) {
+            payload = objectMapper.readValue(payload, String.class);
+        }
+        return objectMapper.readValue(payload, targetType);
     }
 }

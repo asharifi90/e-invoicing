@@ -4,10 +4,10 @@ import org.springframework.stereotype.Component;
 
 import com.einvoicing.invoice.application.port.in.MarkPaymentFailedUseCase;
 import com.einvoicing.invoice.domain.event.PaymentFailedEvent;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
+import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class PaymentFailedListener {
@@ -31,7 +31,7 @@ public class PaymentFailedListener {
     public void onMessage(String message) {
         try {
             PaymentFailedEvent event =
-                    objectMapper.readValue(message, PaymentFailedEvent.class);
+                    deserialize(message, PaymentFailedEvent.class);
             log.info("Received payment.failed for invoice {}", event.getInvoiceId());
             markPaymentFailedUseCase.markPaymentFailed(
                     event.getInvoiceId(),
@@ -40,5 +40,13 @@ public class PaymentFailedListener {
             log.error("Failed to process payment.failed: {}", message, e);
             throw new IllegalArgumentException("Invalid payment.failed message", e);
         }
+    }
+
+    private <T> T deserialize(String message, Class<T> targetType) throws Exception {
+        String payload = message;
+        if (payload != null && payload.startsWith("\"")) {
+            payload = objectMapper.readValue(payload, String.class);
+        }
+        return objectMapper.readValue(payload, targetType);
     }
 }
