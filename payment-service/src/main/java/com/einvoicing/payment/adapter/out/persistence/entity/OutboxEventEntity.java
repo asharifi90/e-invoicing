@@ -27,16 +27,28 @@ public class OutboxEventEntity {
     @Column(name = "published_at")
     private Instant publishedAt;
 
+    @Column(name = "trace_parent")
+    private String traceParent;
+
     protected OutboxEventEntity() {
     }
 
-    public static OutboxEventEntity create(String topic, String payload) {
+    public static OutboxEventEntity create(String topic, String payload, String traceParent) {
         OutboxEventEntity event = new OutboxEventEntity();
         event.id = UUID.randomUUID();
         event.topic = topic;
         event.payload = payload;
         event.createdAt = Instant.now();
+        event.traceParent = traceParent;
         return event;
+    }
+
+    public String getTraceParent() {
+        return traceParent;
+    }
+
+    public void setTraceParent(String traceParent) {
+        this.traceParent = traceParent;
     }
 
     public void markPublished() {

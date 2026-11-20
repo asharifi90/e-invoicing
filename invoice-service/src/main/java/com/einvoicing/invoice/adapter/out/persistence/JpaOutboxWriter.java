@@ -5,15 +5,11 @@ import com.einvoicing.invoice.adapter.out.persistence.repository.OutboxInvoiceRe
 import com.einvoicing.invoice.application.port.out.OutboxWriter;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
-import io.micrometer.tracing.propagation.Propagator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.json.JsonParseException;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
-
-import java.util.HashMap;
-import java.util.Map;
 
 @Component
 public class JpaOutboxWriter implements OutboxWriter {

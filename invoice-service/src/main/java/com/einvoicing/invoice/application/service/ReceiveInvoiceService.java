@@ -8,7 +8,6 @@ import com.einvoicing.invoice.config.TracingKafkaSupport;
 import com.einvoicing.invoice.domain.event.InvoiceReceivedEvent;
 import com.einvoicing.invoice.domain.exception.IdempotencyKeyConflictException;
 import com.einvoicing.invoice.domain.model.aggregate.Invoice;
-import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +24,7 @@ import java.util.Optional;
 @Service
 public class ReceiveInvoiceService implements ReceiveInvoiceUseCase {
 
-    private static final Logger log =  LoggerFactory.getLogger(ReceiveInvoiceService.class);
+    private static final Logger log = LoggerFactory.getLogger(ReceiveInvoiceService.class);
 
     private final InvoiceRepository invoiceRepository;
     private final OutboxWriter outboxWriter;
@@ -62,73 +61,63 @@ public class ReceiveInvoiceService implements ReceiveInvoiceUseCase {
 
         log.info("Receiving invoice with number={}", command.invoiceNumber());
 
-        Span span = tracer.nextSpan().name("receive-invoice").start();
-        try (Tracer.SpanInScope scope = tracer.withSpan(span)) {
-            log.info("span receive-invoice started");
-            span.tag("invoice.number", command.invoiceNumber());
-            String requestHash = requestHash(command);
-            if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-                Optional<IdempotencyStore.IdempotencyRequest> existingRequest =
-                        idempotencyStore.findByKey(idempotencyKey);
-                if (existingRequest.isPresent()) {
-                    if (!existingRequest.get().requestHash().equals(requestHash)) {
-                        throw new IdempotencyKeyConflictException(idempotencyKey);
-                    }
-                    Invoice existingInvoice = invoiceRepository.findById(existingRequest.get().invoiceId())
-                            .orElseThrow(() -> new IllegalStateException(
-                                    "Idempotency key references missing invoice: " + idempotencyKey));
-                    return new ReceiveResult(existingInvoice, false);
+        String requestHash = requestHash(command);
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            Optional<IdempotencyStore.IdempotencyRequest> existingRequest =
+                    idempotencyStore.findByKey(idempotencyKey);
+            if (existingRequest.isPresent()) {
+                if (!existingRequest.get().requestHash().equals(requestHash)) {
+                    throw new IdempotencyKeyConflictException(idempotencyKey);
                 }
-            }
-
-            Optional<Invoice> duplicateInvoice =
-                    invoiceRepository.findByInvoiceNumber(command.invoiceNumber());
-            if (duplicateInvoice.isPresent()) {
-                Invoice existingInvoice = duplicateInvoice.get();
-                if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-                    idempotencyStore.save(idempotencyKey, requestHash, existingInvoice.getId());
-                }
-                log.info("Returning existing invoice with number={}", existingInvoice.getInvoiceNumber());
+                Invoice existingInvoice = invoiceRepository.findById(existingRequest.get().invoiceId())
+                        .orElseThrow(() -> new IllegalStateException(
+                                "Idempotency key references missing invoice: " + idempotencyKey));
                 return new ReceiveResult(existingInvoice, false);
             }
-
-            Invoice invoice = Invoice.create(
-                    command.invoiceNumber(),
-                    command.sellerVatNumber(),
-                    command.buyerVatNumber(),
-                    command.lines()
-            );
-
-            Invoice saved = invoiceRepository.save(invoice);
-
-            log.info("Invoice saved successfully. id={}, number={}",
-                    saved.getId().value(), saved.getInvoiceNumber());
-
-            log.info("before enqueue, currentSpan={}", tracer.currentSpan());
-            String traceParent = tracingKafkaSupport.currentTraceParent();
-            log.info("traceParent={}", traceParent);
-            outboxWriter.enqueue(
-                    "Invoice",
-                    invoice.getId().toString(),
-                    "InvoiceReceived",
-                    new InvoiceReceivedEvent(saved.getId().value(), saved.getInvoiceNumber(),
-                            saved.getTotalAmount().amount(), saved.getTotalAmount().currency()),
-                    traceParent
-            );
-
-            if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-                idempotencyStore.save(idempotencyKey, requestHash, saved.getId());
-            }
-
-            log.info("InvoiceReceivedEvent enqueued for invoiceId={}", saved.getId().value());
-            return new ReceiveResult(saved, true);
-        }catch (RuntimeException e) {
-            log.error("span receive-invoice failed with exception: {}", e.getMessage(), e);
-            span.error(e);
-            throw e;
-        } finally {
-            span.end();
         }
+
+        Optional<Invoice> duplicateInvoice =
+                invoiceRepository.findByInvoiceNumber(command.invoiceNumber());
+        if (duplicateInvoice.isPresent()) {
+            Invoice existingInvoice = duplicateInvoice.get();
+            if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+                idempotencyStore.save(idempotencyKey, requestHash, existingInvoice.getId());
+            }
+            log.info("Returning existing invoice with number={}", existingInvoice.getInvoiceNumber());
+            return new ReceiveResult(existingInvoice, false);
+        }
+
+        Invoice invoice = Invoice.create(
+                command.invoiceNumber(),
+                command.sellerVatNumber(),
+                command.buyerVatNumber(),
+                command.lines()
+        );
+
+        Invoice saved = invoiceRepository.save(invoice);
+
+        log.info("Invoice saved successfully. id={}, number={}",
+                saved.getId().value(), saved.getInvoiceNumber());
+
+        log.info("before enqueue, currentSpan={}", tracer.currentSpan());
+        String traceParent = tracingKafkaSupport.currentTraceParent();
+        log.info("traceParent={}", traceParent);
+        outboxWriter.enqueue(
+                "Invoice",
+                invoice.getId().toString(),
+                "InvoiceReceived",
+                new InvoiceReceivedEvent(saved.getId().value(), saved.getInvoiceNumber(),
+                        saved.getTotalAmount().amount(), saved.getTotalAmount().currency()),
+                traceParent
+        );
+
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            idempotencyStore.save(idempotencyKey, requestHash, saved.getId());
+        }
+
+        log.info("InvoiceReceivedEvent enqueued for invoiceId={}", saved.getId().value());
+        return new ReceiveResult(saved, true);
+
     }
 
     static String requestHash(ReceiveInvoiceCommand command) {

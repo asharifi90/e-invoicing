@@ -45,22 +45,15 @@ public class InvoiceController {
             @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody ReceiveInvoiceRequest request) {
 
-        var span = tracer.nextSpan().name("receive-invoice-controller").start();
-        try (Tracer.SpanInScope ws = tracer.withSpan(span)) {
-            span.tag("invoice.number", request.invoiceNumber());
-
-            ReceiveInvoiceUseCase.ReceiveResult result =
-                    receiveInvoiceUseCase.receive(mapper.toCommand(request), idempotencyKey);
-            Invoice invoice = result.invoice();
-            InvoiceResponse response = mapper.toResponse(invoice);
-
-            return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK).body(response);
-        } catch (RuntimeException e) {
-            span.error(e);
-            throw e;
-        } finally {
-            span.end();
+        if (tracer.currentSpan() != null) {
+            tracer.currentSpan().tag("invoice.number", request.invoiceNumber());
         }
+        ReceiveInvoiceUseCase.ReceiveResult result =
+                receiveInvoiceUseCase.receive(mapper.toCommand(request), idempotencyKey);
+        Invoice invoice = result.invoice();
+        InvoiceResponse response = mapper.toResponse(invoice);
+
+        return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK).body(response);
     }
 
     @GetMapping("/{id}")
