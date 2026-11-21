@@ -16,18 +16,19 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 public class OutboxPublisherJob {
 
-    private static final Logger log = LoggerFactory.getLogger(OutboxPublisherJob.class);
+    private static final Logger log = LoggerFactory.getLogger(com.einvoicing.invoice.adapter.out.messaging.OutboxPublisherJob.class);
 
     private final OutboxInvoiceRepository outboxInvoiceRepository;
     private final KafkaTemplate<String, String> kafkaTemplate;
@@ -37,11 +38,14 @@ public class OutboxPublisherJob {
     private final Tracer tracer;
     private final Propagator propagator;
     private final TracingKafkaSupport tracingKafkaSupport;
+    private final TransactionTemplate transactionTemplate;
 
     public OutboxPublisherJob(OutboxInvoiceRepository outboxInvoiceRepository,
                               KafkaTemplate<String, String> kafkaTemplate,
                               MeterRegistry meterRegistry,
-                              Tracer tracer, Propagator propagator, TracingKafkaSupport tracingKafkaSupport) {
+                              Tracer tracer, Propagator propagator,
+                              TracingKafkaSupport tracingKafkaSupport,
+                              TransactionTemplate transactionTemplate) {
         this.outboxInvoiceRepository = outboxInvoiceRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.publishCounter = Counter.builder("outbox.published")
@@ -53,53 +57,84 @@ public class OutboxPublisherJob {
         this.tracer = tracer;
         this.propagator = propagator;
         this.tracingKafkaSupport = tracingKafkaSupport;
+        this.transactionTemplate = transactionTemplate;
         // Gauge name: outbox.unpublished (current unpublished invoice events).
         Gauge.builder("outbox.unpublished", unpublishedCount, AtomicLong::get)
                 .description("Unpublished invoice outbox events")
                 .register(meterRegistry);
     }
 
-    @Transactional
-    @Scheduled(fixedDelay = 2000)
-    public void publishPending(){
-
+    @Scheduled(fixedDelay = 500)
+    public void publishPending() {
         unpublishedCount.set(outboxInvoiceRepository.countByPublishedAtIsNull());
-        List<OutboxEventEntity> batch = outboxInvoiceRepository.findPending(PageRequest.of(0, 50));
+
+        List<OutboxEventEntity> batch = transactionTemplate.execute(status ->
+                outboxInvoiceRepository.findPending(PageRequest.of(0, 250))
+        );
+
+        if (batch == null || batch.isEmpty()) {
+            return;
+        }
+
+        record InFlightEvent(OutboxEventEntity entity, Span span, CompletableFuture<?> future) {}
+        List<InFlightEvent> inFlight = new ArrayList<>(batch.size());
 
         for (OutboxEventEntity event : batch) {
             String topic = toTopic(event.getEventType());
             String tp = event.getTraceParent();
-            Span span;
-            if (tp != null && !tp.isBlank()) {
-                Map<String, String> carrier = new HashMap<>();
-                carrier.put("traceparent", tp);
-                Span.Builder builder = propagator.extract(carrier, Map::get);
-                span = (builder != null)
-                        ? builder.name("kafka.publish").start()
-                        : tracer.nextSpan().name("kafka.publish").start();
-            } else {
-                span = tracer.nextSpan().name("kafka.publish").start();
-            }
-            try(Tracer.SpanInScope scope = tracer.withSpan(span)) {
+
+            Span span = (tp != null && !tp.isBlank())
+                    ? propagator.extract(Map.of("traceparent", tp), Map::get).name("kafka.publish").start()
+                    : tracer.nextSpan().name("kafka.publish").start();
+
+            try (Tracer.SpanInScope scope = tracer.withSpan(span)) {
                 span.tag("kafka.topic", topic);
                 ProducerRecord<String, String> record =
                         new ProducerRecord<>(topic, event.getAggregatedId(), event.getPayload());
-                tracingKafkaSupport.putTraceParent(record, event.getTraceParent());
-                kafkaTemplate.send(record).get(10, TimeUnit.SECONDS);
-                event.setPublishedAt();
-                publishCounter.increment();
-                outboxInvoiceRepository.save(event);
+                tracingKafkaSupport.putTraceParent(record, tp);
+
+                CompletableFuture<?> future = kafkaTemplate.send(record);
+                inFlight.add(new InFlightEvent(event, span, future));
             } catch (Exception e) {
-                if (e instanceof InterruptedException) {
-                    Thread.currentThread().interrupt();
-                }
-                failCounter.increment();
-                log.warn("Outbox publish failed id={}: {}", event.getId(), e.getMessage());
                 span.error(e);
-                break;
-            }finally {
                 span.end();
+                failCounter.increment();
+                log.warn("Failed to enqueue outbox event id={}: {}", event.getId(), e.getMessage());
             }
+        }
+
+        try {
+            CompletableFuture<Void> allAcks = CompletableFuture.allOf(
+                    inFlight.stream().map(InFlightEvent::future).toArray(CompletableFuture[]::new)
+            );
+            allAcks.get(10, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            log.warn("Batch wait interrupted or timed out: {}", e.getMessage());
+        }
+
+        List<OutboxEventEntity> succeeded = new ArrayList<>();
+        for (InFlightEvent item : inFlight) {
+            try {
+                if (item.future().isDone() && !item.future().isCompletedExceptionally()) {
+                    item.entity().setPublishedAt();
+                    succeeded.add(item.entity());
+                    publishCounter.increment();
+                } else {
+                    failCounter.increment();
+                    item.span().error(new RuntimeException("Kafka publish failed or timed out"));
+                }
+            } finally {
+                item.span().end();
+            }
+        }
+
+        if (!succeeded.isEmpty()) {
+            transactionTemplate.executeWithoutResult(status ->
+                    outboxInvoiceRepository.saveAll(succeeded)
+            );
         }
     }
 

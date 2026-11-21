@@ -43,6 +43,10 @@ public class OutboxEventEntity {
         return event;
     }
 
+    public void setPublishedAt() {
+        this.publishedAt = Instant.now();
+    }
+
     public String getTraceParent() {
         return traceParent;
     }

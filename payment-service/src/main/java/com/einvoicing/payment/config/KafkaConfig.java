@@ -94,6 +94,7 @@ public class KafkaConfig {
         factory.setConsumerFactory(consumerFactory);
         factory.setCommonErrorHandler(errorHandler);
         factory.getContainerProperties().setObservationEnabled(true);
+        factory.setConcurrency(3);
         return factory;
     }
 }
