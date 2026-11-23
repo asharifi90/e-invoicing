@@ -18,9 +18,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -69,7 +71,7 @@ public class OutboxPublisherJob {
         unpublishedCount.set(outboxInvoiceRepository.countByPublishedAtIsNull());
 
         List<OutboxEventEntity> batch = transactionTemplate.execute(status ->
-                outboxInvoiceRepository.findPending(PageRequest.of(0, 250))
+                outboxInvoiceRepository.claimPending(250)
         );
 
         if (batch == null || batch.isEmpty()) {
@@ -115,12 +117,11 @@ public class OutboxPublisherJob {
             log.warn("Batch wait interrupted or timed out: {}", e.getMessage());
         }
 
-        List<OutboxEventEntity> succeeded = new ArrayList<>();
+        List<UUID> succeeded = new ArrayList<>();
         for (InFlightEvent item : inFlight) {
             try {
                 if (item.future().isDone() && !item.future().isCompletedExceptionally()) {
-                    item.entity().setPublishedAt();
-                    succeeded.add(item.entity());
+                    succeeded.add(item.entity.getId());
                     publishCounter.increment();
                 } else {
                     failCounter.increment();
@@ -133,7 +134,7 @@ public class OutboxPublisherJob {
 
         if (!succeeded.isEmpty()) {
             transactionTemplate.executeWithoutResult(status ->
-                    outboxInvoiceRepository.saveAll(succeeded)
+                    outboxInvoiceRepository.markPublished(succeeded, Instant.now())
             );
         }
     }
