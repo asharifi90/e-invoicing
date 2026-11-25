@@ -35,33 +35,29 @@ public class InvoiceReceivedListener {
 
     @KafkaListener(topics = "invoice.received", groupId = "validation-invoice")
     public void onMessage(ConsumerRecord<String, String> record) {
-        Span span = tracer.nextSpan().name("validate-invoice").start();
-        try (Tracer.SpanInScope scope = tracer.withSpan(span)) {
-            InvoiceReceivedEvent event;
-            try {
-                event = objectMapper.readValue(record.value(), InvoiceReceivedEvent.class);
-            } catch (JacksonException e) {
-                log.error("Invalid message received", e);
-                span.error(e);
-                throw new IllegalArgumentException("Invalid message received", e);
-            }
-            span.tag("invoiceId", String.valueOf(event.getInvoiceId()));
-            log.info("received InvoiceReceivedEvent with invoice id : {}", event.getInvoiceId());
-
-            String eventKey = "invoice.received:" + event.getInvoiceId();
-            if (!processedEventStore.tryClaim(eventKey)) {
-                log.info("Skipping duplicate InvoiceReceivedEvent with invoice id: {}", event.getInvoiceId());
-                return;
-            }
-            try {
-                validateInvoiceUseCase.validateReceivedEvent(event);
-            } catch (RuntimeException | Error e) {
-                processedEventStore.release(eventKey);
-                span.error(e);
-                throw e;
-            }
-        }finally {
-            span.end();
+        InvoiceReceivedEvent event;
+        try {
+            event = objectMapper.readValue(record.value(), InvoiceReceivedEvent.class);
+        } catch (JacksonException e) {
+            log.error("Invalid message received", e);
+            throw new IllegalArgumentException("Invalid message received", e);
         }
+        Span current = tracer.currentSpan();
+        if (current != null) {
+            current.tag("invoiceId", String.valueOf(event.getInvoiceId()));
+        }
+        log.info("received InvoiceReceivedEvent with invoice id : {}", event.getInvoiceId());
+        String eventKey = "invoice.received:" + event.getInvoiceId();
+        if (!processedEventStore.tryClaim(eventKey)) {
+            log.info("Skipping duplicate InvoiceReceivedEvent with invoice id: {}", event.getInvoiceId());
+            return;
+        }
+        try {
+            validateInvoiceUseCase.validateReceivedEvent(event);
+        } catch (RuntimeException | Error e) {
+            processedEventStore.release(eventKey);
+            throw e;
+        }
+
     }
 }

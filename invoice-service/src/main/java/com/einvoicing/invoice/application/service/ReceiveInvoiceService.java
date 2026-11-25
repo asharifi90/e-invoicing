@@ -11,8 +11,9 @@ import com.einvoicing.invoice.domain.model.aggregate.Invoice;
 import io.micrometer.tracing.Tracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -31,17 +32,20 @@ public class ReceiveInvoiceService implements ReceiveInvoiceUseCase {
     private final IdempotencyStore idempotencyStore;
     private final Tracer tracer;
     private final TracingKafkaSupport tracingKafkaSupport;
+    private final TransactionTemplate transactionTemplate;
 
     public ReceiveInvoiceService(InvoiceRepository invoiceRepository,
                                  OutboxWriter outboxWriter,
                                  IdempotencyStore idempotencyStore,
                                  Tracer tracer,
-                                 TracingKafkaSupport tracingKafkaSupport) {
+                                 TracingKafkaSupport tracingKafkaSupport,
+                                 TransactionTemplate transactionTemplate) {
         this.invoiceRepository = invoiceRepository;
         this.outboxWriter = outboxWriter;
         this.idempotencyStore = idempotencyStore;
         this.tracer = tracer;
         this.tracingKafkaSupport = tracingKafkaSupport;
+        this.transactionTemplate = transactionTemplate;
     }
 
     /**
@@ -50,14 +54,22 @@ public class ReceiveInvoiceService implements ReceiveInvoiceUseCase {
      * Previously: domainEventPublisher.publish(...) right after save (dual-write risk).
      */
     @Override
-    @Transactional
     public Invoice receive(ReceiveInvoiceCommand command) {
         return receive(command, null).invoice();
     }
 
     @Override
-    @Transactional
     public ReceiveResult receive(ReceiveInvoiceCommand command, String idempotencyKey) {
+        try {
+            return transactionTemplate.execute(status -> receiveInTransaction(command, idempotencyKey));
+        } catch (DataIntegrityViolationException ex) {
+            log.info("Concurrent duplicate detected for invoiceNumber={}, replaying existing result",
+                    command.invoiceNumber());
+            return transactionTemplate.execute(status -> receiveInTransaction(command, idempotencyKey));
+        }
+    }
+
+    private ReceiveResult receiveInTransaction(ReceiveInvoiceCommand command, String idempotencyKey) {
 
         log.info("Receiving invoice with number={}", command.invoiceNumber());
 
@@ -104,7 +116,7 @@ public class ReceiveInvoiceService implements ReceiveInvoiceUseCase {
         log.info("traceParent={}", traceParent);
         outboxWriter.enqueue(
                 "Invoice",
-                invoice.getId().toString(),
+                saved.getId().value().toString(),
                 "InvoiceReceived",
                 new InvoiceReceivedEvent(saved.getId().value(), saved.getInvoiceNumber(),
                         saved.getTotalAmount().amount(), saved.getTotalAmount().currency()),
@@ -117,7 +129,6 @@ public class ReceiveInvoiceService implements ReceiveInvoiceUseCase {
 
         log.info("InvoiceReceivedEvent enqueued for invoiceId={}", saved.getId().value());
         return new ReceiveResult(saved, true);
-
     }
 
     static String requestHash(ReceiveInvoiceCommand command) {
