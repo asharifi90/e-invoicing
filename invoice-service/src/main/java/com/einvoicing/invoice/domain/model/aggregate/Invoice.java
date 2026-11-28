@@ -101,7 +101,13 @@ public class Invoice {
         this.status = InvoiceStatus.VALIDATED;
     }
 
-    public void  markAsRejected(String reason){
+    public void markAsRejected(String reason) {
+        if (this.status == InvoiceStatus.REJECTED) {
+            return; // Idempotent
+        }
+        if (this.status == InvoiceStatus.PAID || this.status == InvoiceStatus.PAYMENT_FAILED) {
+            throw new InvalidInvoiceStateException("Cannot mark REJECTED when status is " + this.status);
+        }
         this.status = InvoiceStatus.REJECTED;
         this.rejectionReason = reason;
     }

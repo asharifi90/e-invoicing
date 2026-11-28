@@ -41,4 +41,7 @@ public interface OutboxInvoiceRepository extends JpaRepository<OutboxEventEntity
         WHERE e.id IN :ids
         """)
     int markPublished(@Param("ids") List<UUID> ids, @Param("now") Instant now);
+
+    @Query("SELECT COUNT(e) FROM OutboxEventEntity e WHERE e.publishedAt IS NULL")
+    long countPending();
 }

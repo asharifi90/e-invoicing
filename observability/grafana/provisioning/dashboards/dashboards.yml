@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: 'E-Invoicing Dashboards'
+    folder: 'E-Invoicing'
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

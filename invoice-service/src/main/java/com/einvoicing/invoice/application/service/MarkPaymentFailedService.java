@@ -3,36 +3,47 @@ package com.einvoicing.invoice.application.service;
 import com.einvoicing.invoice.application.port.in.MarkPaymentFailedUseCase;
 import com.einvoicing.invoice.application.port.out.InvoiceRepository;
 import com.einvoicing.invoice.domain.model.aggregate.Invoice;
+import com.einvoicing.invoice.domain.model.enums.InvoiceStatus;
 import com.einvoicing.invoice.domain.model.valueObject.InvoiceId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Service
 public class MarkPaymentFailedService implements MarkPaymentFailedUseCase {
 
-    private static final Logger log = LoggerFactory.getLogger(MarkPaymentFailedService.class);
-
     private final InvoiceRepository invoiceRepository;
+    private final TransactionTemplate transactionTemplate;
+    private final InvoiceMetricsRecorder metricsRecorder;
 
-    public MarkPaymentFailedService(InvoiceRepository invoiceRepository) {
+    public MarkPaymentFailedService(
+            InvoiceRepository invoiceRepository,
+            TransactionTemplate transactionTemplate,
+            InvoiceMetricsRecorder metricsRecorder) {
         this.invoiceRepository = invoiceRepository;
+        this.transactionTemplate = transactionTemplate;
+        this.metricsRecorder = metricsRecorder;
     }
 
     @Override
-    @Transactional
     public void markPaymentFailed(UUID invoiceId, String reason) {
+        Instant completedAt = Instant.now();
 
-        Invoice invoice = invoiceRepository.findById(new InvoiceId(invoiceId)).orElseThrow(
-                () -> new IllegalArgumentException("Invoice not found" +  invoiceId)
-        );
+        Invoice transitioned = transactionTemplate.execute(status -> {
+            Invoice invoice = invoiceRepository.findById(new InvoiceId(invoiceId))
+                    .orElseThrow(() -> new IllegalArgumentException("Invoice not found: " + invoiceId));
 
-        invoice.markPaymentFailed(reason != null ? "payment failed : " + reason : "Unknown");
-        invoiceRepository.save(invoice);
+            InvoiceStatus previousStatus = invoice.getStatus();
+            invoice.markPaymentFailed(reason);
 
-        log.info("invoice {} marked payment failed with reason {}", invoiceId, reason);
+            if (previousStatus == invoice.getStatus()) {
+                return null;
+            }
+            return invoiceRepository.save(invoice);
+        });
+
+        metricsRecorder.recordE2eDuration(transitioned, completedAt, "PAYMENT_FAILED");
     }
 }
